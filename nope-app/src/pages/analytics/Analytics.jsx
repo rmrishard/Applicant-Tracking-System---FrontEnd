@@ -135,7 +135,7 @@ const Analytics = () => {
 
   // Calculate conversion funnel
   const getConversionFunnel = () => {
-    const statusOrder = ['APPLIED', 'SCREENING', 'INTERVIEW', 'OFFER', 'HIRED'];
+    const statusOrder = ['SOURCED', 'CONTACTED', 'INTERVIEWING', 'OFFER'];
     const statusCounts = applications.reduce((acc, app) => {
       acc[app.status] = (acc[app.status] || 0) + 1;
       return acc;
@@ -167,12 +167,12 @@ const Analytics = () => {
   // Calculate key metrics
   const getKeyMetrics = () => {
     const totalApplications = applications.length;
-    const hiredCount = applications.filter(app => app.status === 'HIRED').length;
-    const rejectedCount = applications.filter(app => app.status === 'REJECTED').length;
-    const activeCount = totalApplications - hiredCount - rejectedCount;
+    const offerCount = applications.filter(app => app.status === 'OFFER').length;
+    const rejectedCount = applications.filter(app => app.status === 'REJECTED' || app.status === 'NOT_INTERESTED').length;
+    const activeCount = totalApplications - offerCount - rejectedCount;
 
     const conversionRate = totalApplications > 0
-      ? ((hiredCount / totalApplications) * 100).toFixed(1)
+      ? ((offerCount / totalApplications) * 100).toFixed(1)
       : 0;
 
     const openJobs = jobs.filter(job => job.status === 'OPEN').length;
@@ -182,7 +182,7 @@ const Analytics = () => {
 
     return {
       totalApplications,
-      hiredCount,
+      offerCount,
       activeCount,
       conversionRate,
       openJobs,

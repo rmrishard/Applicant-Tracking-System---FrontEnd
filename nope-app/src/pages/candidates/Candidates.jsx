@@ -27,6 +27,7 @@ import {
   MenuItem,
   Collapse,
   TableSortLabel,
+  Tooltip,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -38,12 +39,17 @@ import {
   Phone as PhoneIcon,
   FilterList as FilterListIcon,
   Visibility as VisibilityIcon,
+  ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
-import { candidatesAPI } from '../../services/api';
-import { useNavigate } from 'react-router-dom';
+import { candidatesAPI, applicationsAPI } from '../../services/api';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const Candidates = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const fromJobId = searchParams.get('fromJob');
+  const fromJobName = searchParams.get('jobName');
+
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -51,10 +57,12 @@ const Candidates = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [experienceFilter, setExperienceFilter] = useState('ALL');
   const [locationFilter, setLocationFilter] = useState('');
+  const [skillsFilter, setSkillsFilter] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingCandidate, setEditingCandidate] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -65,6 +73,13 @@ const Candidates = () => {
     skills: '',
     linkedInUrl: '',
   });
+
+  // Auto-open dialog if coming from a job
+  useEffect(() => {
+    if (fromJobId) {
+      handleOpenDialog();
+    }
+  }, [fromJobId]);
 
   useEffect(() => {
     fetchCandidates();
@@ -137,10 +152,25 @@ const Candidates = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      setSaving(true);
       if (editingCandidate) {
         await candidatesAPI.update(editingCandidate.id, formData);
       } else {
-        await candidatesAPI.create(formData);
+        const response = await candidatesAPI.create(formData);
+        const newCandidateId = response.data?.id;
+
+        // If creating from a job, auto-link the candidate to the job
+        if (fromJobId && newCandidateId) {
+          await applicationsAPI.create({
+            jobId: parseInt(fromJobId),
+            candidateId: newCandidateId,
+            status: 'SOURCED',
+            notes: `Auto-linked from job #${fromJobId}`,
+          });
+          // Navigate back to the job page
+          navigate(`/jobs/${fromJobId}`);
+          return;
+        }
       }
       fetchCandidates();
       handleCloseDialog();
@@ -149,6 +179,8 @@ const Candidates = () => {
       setError(errorMsg);
       console.error('Error saving candidate:', err);
       console.error('Backend error:', err.response?.data);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -206,7 +238,12 @@ const Candidates = () => {
         !locationFilter ||
         candidate.location?.toLowerCase().includes(locationFilter.toLowerCase());
 
-      return matchesSearch && matchesExperience && matchesLocation;
+      // Skills filter (dedicated)
+      const matchesSkills =
+        !skillsFilter ||
+        candidate.skills?.toLowerCase().includes(skillsFilter.toLowerCase());
+
+      return matchesSearch && matchesExperience && matchesLocation && matchesSkills;
     })
     .sort((a, b) => {
       let compareValue = 0;
@@ -244,6 +281,7 @@ const Candidates = () => {
     setSearchTerm('');
     setExperienceFilter('ALL');
     setLocationFilter('');
+    setSkillsFilter('');
     setSortBy('name');
     setSortOrder('asc');
   };
@@ -258,6 +296,23 @@ const Candidates = () => {
 
   return (
     <Box sx={{ width: '100%', px: { xs: 2, sm: 3, md: 4 }, py: 2 }}>
+      {/* Back button header when coming from a job */}
+      {fromJobId && (
+        <Box mb={2}>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate(`/jobs/${fromJobId}`)}
+            sx={{
+              textTransform: 'none',
+              color: 'text.secondary',
+              fontWeight: 500,
+              '&:hover': { color: 'primary.main', bgcolor: 'transparent' }
+            }}
+          >
+            Back to Job
+          </Button>
+        </Box>
+      )}
       <Box
         sx={{
           display: 'flex',
@@ -269,7 +324,7 @@ const Candidates = () => {
         }}
       >
         <Typography variant="h4" sx={{ fontWeight: 600, color: 'text.primary' }}>
-          Candidates
+          {fromJobId ? `Add New Candidate for Job #${fromJobId}` : 'Candidates'}
         </Typography>
         <Button
           variant="contained"
@@ -372,6 +427,16 @@ const Candidates = () => {
                   />
                 </Grid>
                 <Grid item xs={12} sm={4}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Skills"
+                    value={skillsFilter}
+                    onChange={(e) => setSkillsFilter(e.target.value)}
+                    placeholder="Filter by skills (e.g. React, Python)..."
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
                   <FormControl fullWidth size="small">
                     <InputLabel>Sort By</InputLabel>
                     <Select
@@ -450,13 +515,19 @@ const Candidates = () => {
               {filteredCandidates.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center">
-                    <Box py={6}>
-                      <PeopleIcon sx={{ fontSize: 56, color: 'text.secondary', mb: 2, opacity: 0.5 }} />
-                      <Typography variant="body1" color="text.secondary">
-                        {searchTerm
-                          ? 'No candidates found'
-                          : 'No candidates yet. Add your first candidate!'}
+                    <Box py={6} display="flex" flexDirection="column" alignItems="center">
+                      <PeopleIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                      <Typography variant="h6" color="text.secondary" gutterBottom>
+                        {searchTerm ? 'No candidates found' : 'No candidates yet'}
                       </Typography>
+                      <Typography variant="body2" color="text.secondary" mb={searchTerm ? 3 : 0}>
+                        {searchTerm ? `We couldn't find any candidates matching "${searchTerm}"` : 'Add your first candidate to get started!'}
+                      </Typography>
+                      {searchTerm && (
+                        <Button variant="outlined" onClick={() => setSearchTerm('')}>
+                          Clear Search
+                        </Button>
+                      )}
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -466,16 +537,23 @@ const Candidates = () => {
                     key={candidate.id}
                     hover
                     sx={{
+                      cursor: 'pointer',
+                      '&:nth-of-type(odd)': {
+                        bgcolor: 'background.default',
+                      },
                       '&:hover': {
                         bgcolor: 'action.hover',
                       },
                       transition: 'background-color 0.2s',
                     }}
+                    onClick={() => navigate(`/candidates/${candidate.id}`)}
                   >
                     <TableCell>
                       <Box display="flex" alignItems="center" gap={1.5}>
                         <PeopleIcon sx={{ color: 'primary.main', fontSize: 20 }} />
-                        <Typography variant="body2" fontWeight={600}>{candidate.name}</Typography>
+                        <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 150 }}>
+                          {candidate.name}
+                        </Typography>
                       </Box>
                     </TableCell>
                     <TableCell>
@@ -526,31 +604,39 @@ const Candidates = () => {
                         <Typography variant="body2" color="text.secondary">N/A</Typography>
                       )}
                     </TableCell>
-                    <TableCell align="right">
-                      <IconButton
-                        size="small"
-                        color="info"
-                        onClick={() => navigate(`/candidates/${candidate.id}`)}
-                        sx={{ '&:hover': { bgcolor: 'info.lighter' } }}
-                      >
-                        <VisibilityIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={() => handleOpenDialog(candidate)}
-                        sx={{ ml: 0.5, '&:hover': { bgcolor: 'primary.lighter' } }}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => handleDelete(candidate.id)}
-                        sx={{ ml: 0.5, '&:hover': { bgcolor: 'error.lighter' } }}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
+                    <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                      <Box display="flex" justifyContent="flex-end" gap={1}>
+                        <Tooltip title="View Candidate" placement="top">
+                          <IconButton
+                            size="small"
+                            color="info"
+                            onClick={() => navigate(`/candidates/${candidate.id}`)}
+                            sx={{ '&:hover': { bgcolor: 'info.lighter' } }}
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Edit Candidate" placement="top">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => handleOpenDialog(candidate)}
+                            sx={{ '&:hover': { bgcolor: 'primary.lighter' } }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete Candidate" placement="top">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleDelete(candidate.id)}
+                            sx={{ '&:hover': { bgcolor: 'error.lighter' } }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))
@@ -564,21 +650,29 @@ const Candidates = () => {
       <Dialog
         open={openDialog}
         onClose={handleCloseDialog}
-        maxWidth="md"
+        maxWidth="sm"
         fullWidth
         PaperProps={{
           sx: {
             borderRadius: 2,
-            maxHeight: '90vh',
           }
         }}
       >
         <form onSubmit={handleSubmit}>
           <DialogTitle sx={{ pb: 2, pt: 3, fontWeight: 600 }}>
-            {editingCandidate ? 'Edit Candidate' : 'Add New Candidate'}
+            {editingCandidate
+              ? 'Edit Candidate'
+              : fromJobId
+                ? `Add New Candidate for Job #${fromJobId}`
+                : 'Add New Candidate'}
           </DialogTitle>
-          <DialogContent sx={{ pt: 2 }}>
-            <Grid container spacing={3}>
+          <DialogContent>
+            {fromJobId && (
+              <Alert severity="info" sx={{ mb: 2, borderRadius: 1 }}>
+                This candidate will be automatically linked to the job after creation.
+              </Alert>
+            )}
+            <Grid container spacing={2} sx={{ pt: 2 }}>
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
@@ -666,6 +760,7 @@ const Candidates = () => {
           <DialogActions sx={{ px: 3, py: 2 }}>
             <Button
               onClick={handleCloseDialog}
+              disabled={saving}
               sx={{
                 textTransform: 'none',
                 fontWeight: 500,
@@ -676,6 +771,8 @@ const Candidates = () => {
             <Button
               type="submit"
               variant="contained"
+              disabled={saving}
+              startIcon={saving ? <CircularProgress size={20} /> : null}
               sx={{
                 textTransform: 'none',
                 fontWeight: 500,
@@ -683,7 +780,7 @@ const Candidates = () => {
                 borderRadius: 2,
               }}
             >
-              {editingCandidate ? 'Update' : 'Create'}
+              {saving ? 'Saving...' : (editingCandidate ? 'Update' : 'Create')}
             </Button>
           </DialogActions>
         </form>

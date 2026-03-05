@@ -37,6 +37,89 @@ import {
 } from '@mui/icons-material';
 import { applicationsAPI, jobsAPI, candidatesAPI } from '../../services/api';
 
+const statusOptions = [
+  { value: 'SOURCED', label: 'Sourced' },
+  { value: 'CONTACTED', label: 'Contacted' },
+  { value: 'INTERVIEWING', label: 'Interviewing' },
+  { value: 'OFFER', label: 'Offer' },
+  { value: 'NOT_INTERESTED', label: 'Not Interested' },
+  { value: 'REJECTED', label: 'Rejected' },
+];
+
+const getStatusColor = (status) => {
+  switch (status) {
+    case 'SOURCED':
+      return 'info';
+    case 'CONTACTED':
+      return 'primary';
+    case 'INTERVIEWING':
+      return 'warning';
+    case 'OFFER':
+      return 'success';
+    case 'NOT_INTERESTED':
+      return 'error';
+    case 'REJECTED':
+      return 'error';
+    default:
+      return 'default';
+  }
+};
+
+const StatusSelect = ({ currentStatus, onChange }) => {
+  const [isEditing, setIsEditing] = useState(false);
+
+  const handleChange = (e) => {
+    onChange(e.target.value);
+    setIsEditing(false);
+  };
+
+  if (!isEditing) {
+    return (
+      <Chip
+        label={currentStatus}
+        color={getStatusColor(currentStatus)}
+        size="small"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsEditing(true);
+        }}
+        sx={{
+          fontSize: '0.75rem',
+          fontWeight: 600,
+          borderRadius: 1.5,
+          cursor: 'pointer',
+          '&:hover': { opacity: 0.8 }
+        }}
+      />
+    );
+  }
+
+  return (
+    <FormControl size="small" sx={{ minWidth: 120 }}>
+      <Select
+        value={currentStatus}
+        onChange={handleChange}
+        autoFocus
+        onBlur={() => setIsEditing(false)}
+        onClick={(e) => e.stopPropagation()}
+        sx={{
+          borderRadius: 1.5,
+          '& .MuiSelect-select': {
+            py: 0.5,
+            fontSize: '0.875rem',
+          }
+        }}
+      >
+        {statusOptions.map(opt => (
+          <MenuItem key={opt.value} value={opt.value}>
+            {opt.label}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  );
+};
+
 const Applications = () => {
   const navigate = useNavigate();
   const [applications, setApplications] = useState([]);
@@ -51,7 +134,7 @@ const Applications = () => {
   const [formData, setFormData] = useState({
     jobId: '',
     candidateId: '',
-    status: 'APPLIED',
+    status: 'SOURCED',
     notes: '',
   });
 
@@ -119,7 +202,7 @@ const Applications = () => {
       setFormData({
         jobId: '',
         candidateId: '',
-        status: 'APPLIED',
+        status: 'SOURCED',
         notes: '',
       });
     }
@@ -176,24 +259,6 @@ const Applications = () => {
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'APPLIED':
-        return 'info';
-      case 'SCREENING':
-        return 'primary';
-      case 'INTERVIEW':
-        return 'warning';
-      case 'OFFER':
-        return 'success';
-      case 'HIRED':
-        return 'success';
-      case 'REJECTED':
-        return 'error';
-      default:
-        return 'default';
-    }
-  };
 
   const filteredApplications = applications.filter((app) => {
     const matchesSearch =
@@ -308,11 +373,11 @@ const Applications = () => {
               sx={{ borderRadius: 2 }}
             >
               <MenuItem value="ALL">All Status</MenuItem>
-              <MenuItem value="APPLIED">Applied</MenuItem>
-              <MenuItem value="SCREENING">Screening</MenuItem>
-              <MenuItem value="INTERVIEW">Interview</MenuItem>
+              <MenuItem value="SOURCED">Sourced</MenuItem>
+              <MenuItem value="CONTACTED">Contacted</MenuItem>
+              <MenuItem value="INTERVIEWING">Interviewing</MenuItem>
               <MenuItem value="OFFER">Offer</MenuItem>
-              <MenuItem value="HIRED">Hired</MenuItem>
+              <MenuItem value="NOT_INTERESTED">Not Interested</MenuItem>
               <MenuItem value="REJECTED">Rejected</MenuItem>
             </Select>
           </FormControl>
@@ -380,26 +445,10 @@ const Applications = () => {
                       </Typography>
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      <FormControl size="small" sx={{ minWidth: 130 }}>
-                        <Select
-                          value={app.status}
-                          onChange={(e) => handleStatusChange(app.id, e.target.value)}
-                          sx={{
-                            borderRadius: 1.5,
-                            '& .MuiSelect-select': {
-                              py: 0.5,
-                              fontSize: '0.875rem',
-                            }
-                          }}
-                        >
-                          <MenuItem value="APPLIED">Applied</MenuItem>
-                          <MenuItem value="SCREENING">Screening</MenuItem>
-                          <MenuItem value="INTERVIEW">Interview</MenuItem>
-                          <MenuItem value="OFFER">Offer</MenuItem>
-                          <MenuItem value="HIRED">Hired</MenuItem>
-                          <MenuItem value="REJECTED">Rejected</MenuItem>
-                        </Select>
-                      </FormControl>
+                      <StatusSelect
+                        currentStatus={app.status}
+                        onChange={(newStatus) => handleStatusChange(app.id, newStatus)}
+                      />
                     </TableCell>
                     <TableCell align="right">
                       <IconButton
@@ -506,12 +555,11 @@ const Applications = () => {
                     label="Status"
                     onChange={handleChange}
                   >
-                    <MenuItem value="APPLIED">Applied</MenuItem>
-                    <MenuItem value="SCREENING">Screening</MenuItem>
-                    <MenuItem value="INTERVIEW">Interview</MenuItem>
-                    <MenuItem value="OFFER">Offer</MenuItem>
-                    <MenuItem value="HIRED">Hired</MenuItem>
-                    <MenuItem value="REJECTED">Rejected</MenuItem>
+                    {statusOptions.map(opt => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Grid>

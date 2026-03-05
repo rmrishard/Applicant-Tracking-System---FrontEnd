@@ -23,6 +23,7 @@ import {
   DialogActions,
   Grid,
   MenuItem,
+  Tooltip,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -239,6 +240,7 @@ const Companies = () => {
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Industry</TableCell>
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Location</TableCell>
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Website</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Added By</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -246,11 +248,19 @@ const Companies = () => {
               {filteredCompanies.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center">
-                    <Box py={6}>
-                      <BusinessIcon sx={{ fontSize: 56, color: 'text.secondary', mb: 2, opacity: 0.5 }} />
-                      <Typography variant="body1" color="text.secondary">
-                        {searchTerm ? 'No companies found' : 'No companies yet. Add your first company!'}
+                    <Box py={6} display="flex" flexDirection="column" alignItems="center">
+                      <BusinessIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                      <Typography variant="h6" color="text.secondary" gutterBottom>
+                        {searchTerm ? 'No companies found' : 'No companies yet'}
                       </Typography>
+                      <Typography variant="body2" color="text.secondary" mb={searchTerm ? 3 : 0}>
+                        {searchTerm ? `We couldn't find any companies matching "${searchTerm}"` : 'Add your first company to get started!'}
+                      </Typography>
+                      {searchTerm && (
+                        <Button variant="outlined" onClick={() => setSearchTerm('')}>
+                          Clear Search
+                        </Button>
+                      )}
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -261,6 +271,9 @@ const Companies = () => {
                     hover
                     sx={{
                       cursor: 'pointer',
+                      '&:nth-of-type(odd)': {
+                        bgcolor: 'background.default',
+                      },
                       '&:hover': {
                         bgcolor: 'action.hover',
                       },
@@ -320,38 +333,48 @@ const Companies = () => {
                         <Typography variant="body2" color="text.secondary">N/A</Typography>
                       )}
                     </TableCell>
-                    <TableCell align="right">
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenDialog(company);
-                        }}
-                        sx={{
-                          '&:hover': {
-                            bgcolor: 'primary.lighter',
-                          }
-                        }}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(company.id);
-                        }}
-                        sx={{
-                          ml: 0.5,
-                          '&:hover': {
-                            bgcolor: 'error.lighter',
-                          }
-                        }}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {company.createdBy?.name || 'System'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                      <Box display="flex" justifyContent="flex-end" gap={1}>
+                        <Tooltip title="Edit Company" placement="top">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenDialog(company);
+                            }}
+                            sx={{
+                              '&:hover': {
+                                bgcolor: 'primary.lighter',
+                              }
+                            }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete Company" placement="top">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(company.id);
+                            }}
+                            sx={{
+                              '&:hover': {
+                                bgcolor: 'error.lighter',
+                              }
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))
@@ -370,7 +393,6 @@ const Companies = () => {
         PaperProps={{
           sx: {
             borderRadius: 2,
-            maxHeight: '90vh',
           }
         }}
       >
@@ -378,8 +400,8 @@ const Companies = () => {
           <DialogTitle sx={{ pb: 2, pt: 3, fontWeight: 600 }}>
             {editingCompany ? 'Edit Company' : 'Add New Company'}
           </DialogTitle>
-          <DialogContent sx={{ pt: 2 }}>
-            <Grid container spacing={3}>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ pt: 2 }}>
               <Grid item xs={12}>
                 <TextField
                   fullWidth
@@ -388,16 +410,6 @@ const Companies = () => {
                   value={formData.name}
                   onChange={handleChange}
                   required
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Phone"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  placeholder="+1234567890"
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -420,7 +432,17 @@ const Companies = () => {
                   required
                 />
               </Grid>
-              <Grid item xs={12}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Phone"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="+1234567890"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="Website"
@@ -438,7 +460,7 @@ const Companies = () => {
                   value={formData.description}
                   onChange={handleChange}
                   multiline
-                  rows={3}
+                  rows={2}
                 />
               </Grid>
             </Grid>

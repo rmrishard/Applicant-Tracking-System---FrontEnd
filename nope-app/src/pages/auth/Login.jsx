@@ -47,7 +47,7 @@ const Login = () => {
     try {
       const result = await login(formData);
       if (result.success) {
-        navigate('/dashboard');
+        navigate('/companies');
       } else {
         setError(result.error);
       }

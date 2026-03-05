@@ -17,15 +17,12 @@ import {
   StepLabel,
   StepContent,
   FormControl,
-  InputLabel,
   Select,
   MenuItem,
   TextField,
   Paper,
   List,
   ListItem,
-  ListItemText,
-  Rating,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -36,7 +33,6 @@ import {
   Business as BusinessIcon,
   Event as EventIcon,
   Note as NoteIcon,
-  Star as StarIcon,
   CheckCircle as CheckCircleIcon,
   RadioButtonUnchecked as RadioButtonUncheckedIcon,
 } from '@mui/icons-material';
@@ -61,8 +57,6 @@ const ApplicationDetail = () => {
   const [error, setError] = useState('');
   const [newNote, setNewNote] = useState('');
   const [notes, setNotes] = useState([]);
-  const [rating, setRating] = useState(0);
-  const [feedback, setFeedback] = useState('');
 
   useEffect(() => {
     fetchApplicationData();
@@ -73,8 +67,6 @@ const ApplicationDetail = () => {
       setLoading(true);
       const response = await applicationsAPI.getById(id);
       setApplication(response.data);
-      setRating(response.data.rating || 0);
-      setFeedback(response.data.feedback || '');
       setError('');
 
       // Fetch notes separately
@@ -93,7 +85,6 @@ const ApplicationDetail = () => {
       setNotes(response.data || []);
     } catch (err) {
       console.error('Error fetching notes:', err);
-      // Don't show error to user for notes fetch failure
     }
   };
 
@@ -119,21 +110,6 @@ const ApplicationDetail = () => {
     }
   };
 
-  const handleSaveRating = async () => {
-    try {
-      await applicationsAPI.update(id, {
-        ...application,
-        rating,
-        feedback,
-      });
-      setError('');
-      fetchApplicationData();
-    } catch (err) {
-      setError('Failed to save rating and feedback');
-      console.error('Error saving rating:', err);
-    }
-  };
-
   const handleAddNote = async () => {
     if (!newNote.trim()) return;
 
@@ -152,29 +128,21 @@ const ApplicationDetail = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'APPLIED':
-        return 'info';
-      case 'SCREENING':
-        return 'primary';
-      case 'INTERVIEW':
-        return 'warning';
-      case 'OFFER':
-        return 'success';
-      case 'HIRED':
-        return 'success';
-      case 'REJECTED':
-        return 'error';
-      default:
-        return 'default';
+      case 'SOURCED': return 'info';
+      case 'CONTACTED': return 'primary';
+      case 'INTERVIEWING': return 'warning';
+      case 'OFFER': return 'success';
+      case 'NOT_INTERESTED': return 'error';
+      case 'REJECTED': return 'error';
+      default: return 'default';
     }
   };
 
   const getStatusSteps = () => {
-    const statuses = ['APPLIED', 'SCREENING', 'INTERVIEW', 'OFFER', 'HIRED'];
+    const statuses = ['SOURCED', 'CONTACTED', 'INTERVIEWING', 'OFFER'];
     const currentIndex = statuses.indexOf(application?.status);
 
-    // If status is REJECTED, show all as incomplete except APPLIED
-    if (application?.status === 'REJECTED') {
+    if (application?.status === 'REJECTED' || application?.status === 'NOT_INTERESTED') {
       return statuses.map((status, index) => ({
         label: status,
         completed: index === 0,
@@ -201,11 +169,7 @@ const ApplicationDetail = () => {
     return (
       <Box>
         <Alert severity="error">Application not found</Alert>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/applications')}
-          sx={{ mt: 2 }}
-        >
+        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/applications')} sx={{ mt: 2 }}>
           Back to Applications
         </Button>
       </Box>
@@ -217,7 +181,6 @@ const ApplicationDetail = () => {
 
   return (
     <Box>
-      {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box display="flex" alignItems="center" gap={2}>
           <IconButton onClick={() => navigate('/applications')}>
@@ -231,12 +194,8 @@ const ApplicationDetail = () => {
           </Box>
         </Box>
         <Box>
-          <Button startIcon={<EditIcon />} onClick={() => navigate('/applications')} sx={{ mr: 1 }}>
-            Edit
-          </Button>
-          <Button startIcon={<DeleteIcon />} color="error" onClick={handleDelete}>
-            Delete
-          </Button>
+          <Button startIcon={<EditIcon />} onClick={() => navigate('/applications')} sx={{ mr: 1 }}>Edit</Button>
+          <Button startIcon={<DeleteIcon />} color="error" onClick={handleDelete}>Delete</Button>
         </Box>
       </Box>
 
@@ -247,23 +206,18 @@ const ApplicationDetail = () => {
       )}
 
       <Grid container spacing={3}>
-        {/* Application Information */}
-        <Grid item xs={12} md={8}>
+        {/* Main Content (Left Column) */}
+        <Grid item xs={12} md={7}>
           <Card sx={{ mb: 3 }}>
             <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Application Information
-              </Typography>
+              <Typography variant="h6" gutterBottom>Application Information</Typography>
               <Divider sx={{ mb: 2 }} />
-
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                   <Box display="flex" alignItems="center" gap={1} mb={2}>
                     <PersonIcon color="action" />
                     <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Candidate
-                      </Typography>
+                      <Typography variant="caption" color="text.secondary">Candidate</Typography>
                       <Typography
                         variant="body1"
                         fontWeight="medium"
@@ -272,20 +226,15 @@ const ApplicationDetail = () => {
                       >
                         {application.candidate?.name}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {application.candidate?.email}
-                      </Typography>
+                      <Typography variant="caption" color="text.secondary">{application.candidate?.email}</Typography>
                     </Box>
                   </Box>
                 </Grid>
-
                 <Grid item xs={12} sm={6}>
                   <Box display="flex" alignItems="center" gap={1} mb={2}>
                     <WorkIcon color="action" />
                     <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Job
-                      </Typography>
+                      <Typography variant="caption" color="text.secondary">Job</Typography>
                       <Typography
                         variant="body1"
                         fontWeight="medium"
@@ -297,52 +246,36 @@ const ApplicationDetail = () => {
                     </Box>
                   </Box>
                 </Grid>
-
                 <Grid item xs={12} sm={6}>
                   <Box display="flex" alignItems="center" gap={1} mb={2}>
                     <BusinessIcon color="action" />
                     <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Company
-                      </Typography>
-                      <Typography variant="body1">
-                        {application.job?.company?.name || 'N/A'}
-                      </Typography>
+                      <Typography variant="caption" color="text.secondary">Company</Typography>
+                      <Typography variant="body1">{application.job?.company?.name || 'N/A'}</Typography>
                     </Box>
                   </Box>
                 </Grid>
-
                 <Grid item xs={12} sm={6}>
                   <Box display="flex" alignItems="center" gap={1} mb={2}>
                     <EventIcon color="action" />
                     <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Applied Date
-                      </Typography>
+                      <Typography variant="caption" color="text.secondary">Applied Date</Typography>
                       <Typography variant="body1">
-                        {application.appliedDate
-                          ? new Date(application.appliedDate).toLocaleDateString()
-                          : 'N/A'}
+                        {application.appliedDate ? new Date(application.appliedDate).toLocaleDateString() : 'N/A'}
                       </Typography>
                     </Box>
                   </Box>
                 </Grid>
-
                 <Grid item xs={12}>
-                  <Typography variant="caption" color="text.secondary" gutterBottom>
-                    Status
-                  </Typography>
+                  <Typography variant="caption" color="text.secondary" gutterBottom>Status</Typography>
                   <Box mt={1}>
                     <FormControl fullWidth size="small">
-                      <Select
-                        value={application.status}
-                        onChange={(e) => handleStatusChange(e.target.value)}
-                      >
-                        <MenuItem value="APPLIED">Applied</MenuItem>
-                        <MenuItem value="SCREENING">Screening</MenuItem>
-                        <MenuItem value="INTERVIEW">Interview</MenuItem>
+                      <Select value={application.status} onChange={(e) => handleStatusChange(e.target.value)}>
+                        <MenuItem value="SOURCED">Sourced</MenuItem>
+                        <MenuItem value="CONTACTED">Contacted</MenuItem>
+                        <MenuItem value="INTERVIEWING">Interviewing</MenuItem>
                         <MenuItem value="OFFER">Offer</MenuItem>
-                        <MenuItem value="HIRED">Hired</MenuItem>
+                        <MenuItem value="NOT_INTERESTED">Not Interested</MenuItem>
                         <MenuItem value="REJECTED">Rejected</MenuItem>
                       </Select>
                     </FormControl>
@@ -352,38 +285,21 @@ const ApplicationDetail = () => {
             </CardContent>
           </Card>
 
-          {/* Application Progress */}
-          <Card sx={{ mb: 3 }}>
+          <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Application Progress
-              </Typography>
+              <Typography variant="h6" gutterBottom>Application Progress</Typography>
               <Divider sx={{ mb: 2 }} />
-
               {application.status === 'REJECTED' ? (
                 <Box textAlign="center" py={3}>
-                  <Chip
-                    label="APPLICATION REJECTED"
-                    color="error"
-                    size="large"
-                    sx={{ mb: 2 }}
-                  />
-                  <Typography variant="body2" color="text.secondary">
-                    This application was not successful
-                  </Typography>
+                  <Chip label="APPLICATION REJECTED" color="error" size="large" sx={{ mb: 2 }} />
+                  <Typography variant="body2" color="text.secondary">This application was not successful</Typography>
                 </Box>
               ) : (
                 <Stepper activeStep={activeStep} orientation="vertical">
-                  {steps.map((step, index) => (
+                  {steps.map((step) => (
                     <Step key={step.label} completed={step.completed}>
                       <StepLabel
-                        StepIconComponent={
-                          step.completed
-                            ? CompletedIcon
-                            : step.active
-                            ? undefined
-                            : PendingIcon
-                        }
+                        StepIconComponent={step.completed ? CompletedIcon : step.active ? undefined : PendingIcon}
                       >
                         <Typography
                           variant="body1"
@@ -404,51 +320,10 @@ const ApplicationDetail = () => {
               )}
             </CardContent>
           </Card>
-
-          {/* Rating and Feedback */}
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Rating & Feedback
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-
-              <Box mb={2}>
-                <Typography variant="caption" color="text.secondary" gutterBottom>
-                  Candidate Rating
-                </Typography>
-                <Box display="flex" alignItems="center" gap={1} mt={1}>
-                  <Rating
-                    value={rating}
-                    onChange={(e, newValue) => setRating(newValue)}
-                    size="large"
-                  />
-                  <Typography variant="body2" color="text.secondary">
-                    {rating > 0 ? `${rating} / 5` : 'Not rated'}
-                  </Typography>
-                </Box>
-              </Box>
-
-              <TextField
-                fullWidth
-                label="Feedback"
-                multiline
-                rows={4}
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Add your feedback about this candidate..."
-                sx={{ mb: 2 }}
-              />
-
-              <Button variant="contained" onClick={handleSaveRating}>
-                Save Rating & Feedback
-              </Button>
-            </CardContent>
-          </Card>
         </Grid>
 
-        {/* Notes Section */}
-        <Grid item xs={12} md={4}>
+        {/* Sidebar (Right Column) */}
+        <Grid item xs={12} md={5}>
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
@@ -456,7 +331,6 @@ const ApplicationDetail = () => {
                 Notes & Communication
               </Typography>
               <Divider sx={{ mb: 2 }} />
-
               <TextField
                 fullWidth
                 multiline
@@ -475,11 +349,8 @@ const ApplicationDetail = () => {
               >
                 Add Note
               </Button>
-
               <Box mt={3}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Notes History
-                </Typography>
+                <Typography variant="subtitle2" gutterBottom>Notes History</Typography>
                 {notes && notes.length > 0 ? (
                   <Paper variant="outlined" sx={{ p: 0, maxHeight: 400, overflow: 'auto' }}>
                     <List>
@@ -490,7 +361,7 @@ const ApplicationDetail = () => {
                           sx={{ flexDirection: 'column', alignItems: 'flex-start' }}
                         >
                           <Typography variant="caption" color="text.secondary" gutterBottom>
-                            {new Date(note.createdAt).toLocaleString()} - {note.noteType || 'GENERAL'}
+                            {new Date(note.createdAt).toLocaleString()} - {note.createdBy?.name || 'System'} ({note.noteType || 'GENERAL'})
                           </Typography>
                           <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                             {note.content}
@@ -500,9 +371,7 @@ const ApplicationDetail = () => {
                     </List>
                   </Paper>
                 ) : (
-                  <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                    No notes yet
-                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>No notes yet</Typography>
                 )}
               </Box>
             </CardContent>

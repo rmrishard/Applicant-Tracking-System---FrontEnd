@@ -28,7 +28,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !(error.config?.url?.includes('/api/users'))) {
       // Token expired or invalid
       localStorage.removeItem('token');
       localStorage.removeItem('user');
@@ -38,20 +38,43 @@ api.interceptors.response.use(
   }
 );
 
+const transformUser = (user) => {
+  if (!user) return null;
+
+  // Handle both camelCase and snake_case
+  const firstName = user.firstName || user.first_name || '';
+  const lastName = user.lastName || user.last_name || '';
+  const username = user.username || '';
+
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  return {
+    ...user,
+    name: fullName || username || 'System User',
+  };
+};
+
 // Helper functions to transform backend responses to frontend format
 const transformCompany = (company) => {
   if (!company) return null;
-  // Note: Backend Company entity uses 'phone' directly, not 'phoneNumber'
   return {
     ...company,
+    createdBy: company.createdBy ? transformUser(company.createdBy) : null,
   };
 };
 
 const transformCandidate = (candidate) => {
   if (!candidate) return null;
+
+  // Create name from user fields only if we don't already have one
+  let formattedName = candidate.name;
+  if (!formattedName && (candidate.firstName || candidate.lastName)) {
+    formattedName = `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim();
+  }
+
   return {
     ...candidate,
-    name: `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim(),
+    name: formattedName,
     // Note: Backend uses 'phone' directly, not 'phoneNumber'
     experience: candidate.experienceYears,
     linkedInUrl: candidate.linkedinUrl, // lowercase 'u'
@@ -73,12 +96,19 @@ const transformJob = (job) => {
     salaryRange = `Up to ${job.maxSalary}`;
   }
 
+  // Ensure we at least have shell objects for users if the backend only sends IDs
+  const transformedCreatedBy = job.createdBy ? transformUser(job.createdBy) : null;
+  const transformedAssignedRecruiter = (job.assignedRecruiter || job.recruiter) ?
+    transformUser(job.assignedRecruiter || job.recruiter) : null;
+
   return {
     ...job,
     companyId: job.company?.id,
-    recruiterId: job.assignedRecruiter?.id,
+    recruiterId: transformedAssignedRecruiter?.id || job.recruiterId,
     salaryRange: salaryRange,
     company: job.company ? transformCompany(job.company) : null,
+    assignedRecruiter: transformedAssignedRecruiter,
+    createdBy: transformedCreatedBy,
   };
 };
 
@@ -87,18 +117,32 @@ const transformApplication = (application) => {
   return {
     ...application,
     appliedDate: application.appliedAt,
-    // Backend uses INTERVIEWING, frontend uses INTERVIEW
-    status: application.status === 'INTERVIEWING' ? 'INTERVIEW' : application.status,
     candidate: application.candidate ? transformCandidate(application.candidate) : null,
     job: application.job ? transformJob(application.job) : null,
+    createdBy: application.createdBy ? transformUser(application.createdBy) : null,
   };
 };
 
 // Auth API calls
 export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
-  register: (userData) => api.post('/auth/register', userData),
-  getCurrentUser: () => api.get('/auth/me'),
+  register: async (userData) => {
+    const response = await api.post('/auth/register', userData);
+    if (response.data && response.data.user) {
+      response.data.user = transformUser(response.data.user);
+    } else if (response.data && !response.data.token) {
+      // If the response is just the user object
+      response.data = transformUser(response.data);
+    }
+    return response;
+  },
+  getCurrentUser: async () => {
+    const response = await api.get('/auth/me');
+    if (response.data) {
+      response.data = transformUser(response.data);
+    }
+    return response;
+  },
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -110,19 +154,23 @@ export const authAPI = {
 export const companiesAPI = {
   getAll: async (params) => {
     const response = await api.get('/api/companies', { params });
-    // Handle paginated response
-    if (Array.isArray(response.data)) {
-      response.data = response.data.map(transformCompany);
-    } else if (response.data.content) {
-      response.data.content = response.data.content.map(transformCompany);
-    } else if (response.data.companies) {
-      response.data.content = response.data.companies.map(transformCompany);
+    const rawData = response.data?.data || response.data;
+
+    if (Array.isArray(rawData)) {
+      response.data = rawData.map(transformCompany);
+    } else if (rawData?.content) {
+      response.data = { ...rawData, content: rawData.content.map(transformCompany) };
+    } else if (rawData?.companies) {
+      response.data = { ...rawData, content: rawData.companies.map(transformCompany) };
+    } else {
+      response.data = rawData;
     }
     return response;
   },
   getById: async (id) => {
     const response = await api.get(`/api/companies/${id}`);
-    response.data = transformCompany(response.data);
+    const rawData = response.data?.data || response.data;
+    response.data = transformCompany(rawData);
     return response;
   },
   create: async (data) => {
@@ -138,7 +186,8 @@ export const companiesAPI = {
     };
     console.log('Creating company with payload:', JSON.stringify(payload, null, 2));
     const response = await api.post('/api/companies', payload);
-    response.data = transformCompany(response.data);
+    const rawData = response.data?.data || response.data;
+    response.data = transformCompany(rawData);
     return response;
   },
   update: async (id, data) => {
@@ -154,7 +203,8 @@ export const companiesAPI = {
     };
     console.log('Updating company', id, 'with payload:', JSON.stringify(payload, null, 2));
     const response = await api.put(`/api/companies/${id}`, payload);
-    response.data = transformCompany(response.data);
+    const rawData = response.data?.data || response.data;
+    response.data = transformCompany(rawData);
     return response;
   },
   delete: (id) => api.delete(`/api/companies/${id}`),
@@ -164,19 +214,23 @@ export const companiesAPI = {
 export const jobsAPI = {
   getAll: async (params) => {
     const response = await api.get('/api/jobs', { params });
-    // Handle paginated response
-    if (Array.isArray(response.data)) {
-      response.data = response.data.map(transformJob);
-    } else if (response.data.content) {
-      response.data.content = response.data.content.map(transformJob);
-    } else if (response.data.jobs) {
-      response.data.content = response.data.jobs.map(transformJob);
+    const rawData = response.data?.data || response.data;
+
+    if (Array.isArray(rawData)) {
+      response.data = rawData.map(transformJob);
+    } else if (rawData?.content) {
+      response.data = { ...rawData, content: rawData.content.map(transformJob) };
+    } else if (rawData?.jobs) {
+      response.data = { ...rawData, content: rawData.jobs.map(transformJob) };
+    } else {
+      response.data = rawData;
     }
     return response;
   },
   getById: async (id) => {
     const response = await api.get(`/api/jobs/${id}`);
-    response.data = transformJob(response.data);
+    const rawData = response.data?.data || response.data;
+    response.data = transformJob(rawData);
     return response;
   },
   create: async (data) => {
@@ -214,12 +268,14 @@ export const jobsAPI = {
       maxSalary: maxSalary,
       deadline: data.deadline,
       company: { id: parseInt(data.companyId) },
-      assignedRecruiter: data.recruiterId ? { id: parseInt(data.recruiterId) } : undefined,
+      assignedRecruiter: data.recruiterId && data.recruiterId !== '' ? { id: parseInt(data.recruiterId) } : null,
+      assignedRecruiterId: data.recruiterId && data.recruiterId !== '' ? parseInt(data.recruiterId) : null,
     };
 
     console.log('Creating job with payload:', JSON.stringify(payload, null, 2));
     const response = await api.post('/api/jobs', payload);
-    response.data = transformJob(response.data);
+    const rawData = response.data?.data || response.data;
+    response.data = transformJob(rawData);
     return response;
   },
   update: async (id, data) => {
@@ -262,7 +318,8 @@ export const jobsAPI = {
 
     console.log('Updating job', id, 'with payload:', JSON.stringify(payload, null, 2));
     const response = await api.put(`/api/jobs/${id}`, payload);
-    response.data = transformJob(response.data);
+    const rawData = response.data?.data || response.data;
+    response.data = transformJob(rawData);
     return response;
   },
   delete: (id) => api.delete(`/api/jobs/${id}`),
@@ -284,19 +341,22 @@ export const jobsAPI = {
 export const candidatesAPI = {
   getAll: async (params) => {
     const response = await api.get('/api/candidates', { params });
-    // Handle paginated response
-    if (Array.isArray(response.data)) {
-      response.data = response.data.map(transformCandidate);
-    } else if (response.data.content) {
-      response.data.content = response.data.content.map(transformCandidate);
-    } else if (response.data.candidates) {
-      response.data.candidates = response.data.candidates.map(transformCandidate);
+    const rawData = response.data?.data || response.data;
+    if (Array.isArray(rawData)) {
+      response.data = rawData.map(transformCandidate);
+    } else if (rawData?.content) {
+      response.data = { ...rawData, content: rawData.content.map(transformCandidate) };
+    } else if (rawData?.candidates) {
+      response.data = { ...rawData, content: rawData.candidates.map(transformCandidate) };
+    } else {
+      response.data = rawData;
     }
     return response;
   },
   getById: async (id) => {
     const response = await api.get(`/api/candidates/${id}`);
-    response.data = transformCandidate(response.data);
+    const rawData = response.data?.data || response.data;
+    response.data = transformCandidate(rawData);
     return response;
   },
   create: async (data) => {
@@ -318,7 +378,8 @@ export const candidatesAPI = {
     };
     console.log('Creating candidate with payload:', JSON.stringify(payload, null, 2));
     const response = await api.post('/api/candidates', payload);
-    response.data = transformCandidate(response.data);
+    const rawData = response.data?.data || response.data;
+    response.data = transformCandidate(rawData);
     return response;
   },
   update: async (id, data) => {
@@ -340,7 +401,8 @@ export const candidatesAPI = {
     };
     console.log('Updating candidate', id, 'with payload:', JSON.stringify(payload, null, 2));
     const response = await api.put(`/api/candidates/${id}`, payload);
-    response.data = transformCandidate(response.data);
+    const rawData = response.data?.data || response.data;
+    response.data = transformCandidate(rawData);
     return response;
   },
   delete: (id) => api.delete(`/api/candidates/${id}`),
@@ -352,7 +414,8 @@ export const candidatesAPI = {
         'Content-Type': 'multipart/form-data',
       },
     });
-    response.data = transformCandidate(response.data);
+    const rawData = response.data?.data || response.data;
+    response.data = transformCandidate(rawData);
     return response;
   },
 };
@@ -361,11 +424,29 @@ export const candidatesAPI = {
 export const applicationNotesAPI = {
   getByApplication: async (applicationId) => {
     const response = await api.get(`/api/applications/${applicationId}/notes`);
+    const rawData = response.data?.data || response.data;
+    if (Array.isArray(rawData)) {
+      response.data = rawData.map(note => ({
+        ...note,
+        createdBy: note.createdBy ? transformUser(note.createdBy) : null
+      }));
+    } else {
+      response.data = rawData;
+    }
     return response;
   },
   create: async (applicationId, noteData) => {
     // noteData should include: content, noteType (optional, defaults to GENERAL)
     const response = await api.post(`/api/applications/${applicationId}/notes`, noteData);
+    const rawData = response.data?.data || response.data;
+    if (rawData) {
+      response.data = {
+        ...rawData,
+        createdBy: rawData.createdBy ? transformUser(rawData.createdBy) : null
+      };
+    } else {
+      response.data = rawData;
+    }
     return response;
   },
   delete: (noteId) => api.delete(`/api/application-notes/${noteId}`),
@@ -375,19 +456,22 @@ export const applicationNotesAPI = {
 export const applicationsAPI = {
   getAll: async (params) => {
     const response = await api.get('/api/applications', { params });
-    // Handle paginated response
-    if (Array.isArray(response.data)) {
-      response.data = response.data.map(transformApplication);
-    } else if (response.data.content) {
-      response.data.content = response.data.content.map(transformApplication);
-    } else if (response.data.applications) {
-      response.data.content = response.data.applications.map(transformApplication);
+    const rawData = response.data?.data || response.data;
+    if (Array.isArray(rawData)) {
+      response.data = rawData.map(transformApplication);
+    } else if (rawData?.content) {
+      response.data = { ...rawData, content: rawData.content.map(transformApplication) };
+    } else if (rawData?.applications) {
+      response.data = { ...rawData, content: rawData.applications.map(transformApplication) };
+    } else {
+      response.data = rawData;
     }
     return response;
   },
   getById: async (id) => {
     const response = await api.get(`/api/applications/${id}`);
-    response.data = transformApplication(response.data);
+    const rawData = response.data?.data || response.data;
+    response.data = transformApplication(rawData);
     return response;
   },
   create: async (data) => {
@@ -395,42 +479,43 @@ export const applicationsAPI = {
     const candidateId = data.candidateId;
     const jobId = data.jobId;
     const response = await api.post(`/api/applications/candidate/${candidateId}/job/${jobId}`);
-    response.data = transformApplication(response.data);
+    const rawData = response.data?.data || response.data;
+    response.data = transformApplication(rawData);
     return response;
   },
   update: async (id, data) => {
     // Map frontend field names - Applications don't have notes field in backend
-    // Convert INTERVIEW to INTERVIEWING for backend
-    const backendStatus = data.status === 'INTERVIEW' ? 'INTERVIEWING' : data.status;
     const payload = {
-      status: backendStatus,
+      status: data.status,
       rating: data.rating,
       followUpDate: data.followUpDate,
     };
     const response = await api.put(`/api/applications/${id}`, payload);
-    response.data = transformApplication(response.data);
+    const rawData = response.data?.data || response.data;
+    response.data = transformApplication(rawData);
     return response;
   },
   updateStatus: async (id, status) => {
-    // Backend expects: PUT /api/applications/{id}/status?status=SCREENING
-    // Convert INTERVIEW to INTERVIEWING for backend
-    const backendStatus = status === 'INTERVIEW' ? 'INTERVIEWING' : status;
+    // Backend expects: PUT /api/applications/{id}/status?status={status}
     const response = await api.put(`/api/applications/${id}/status`, null, {
-      params: { status: backendStatus }
+      params: { status: status }
     });
-    response.data = transformApplication(response.data);
+    const rawData = response.data?.data || response.data;
+    response.data = transformApplication(rawData);
     return response;
   },
   delete: (id) => api.delete(`/api/applications/${id}`),
   getByJob: async (jobId) => {
     const response = await api.get(`/api/applications/job/${jobId}`);
-    // Handle paginated response
-    if (Array.isArray(response.data)) {
-      response.data = response.data.map(transformApplication);
-    } else if (response.data.content) {
-      response.data.content = response.data.content.map(transformApplication);
-    } else if (response.data.applications) {
-      response.data.content = response.data.applications.map(transformApplication);
+    const rawData = response.data?.data || response.data;
+    if (Array.isArray(rawData)) {
+      response.data = rawData.map(transformApplication);
+    } else if (rawData?.content) {
+      response.data = { ...rawData, content: rawData.content.map(transformApplication) };
+    } else if (rawData?.applications) {
+      response.data = { ...rawData, content: rawData.applications.map(transformApplication) };
+    } else {
+      response.data = rawData;
     }
     return response;
   },
@@ -448,26 +533,22 @@ export const applicationsAPI = {
   },
 };
 
-// Helper function to transform User entity
-const transformUser = (user) => {
-  if (!user) return null;
-  return {
-    ...user,
-    name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-  };
-};
 
 // Users API calls
 export const usersAPI = {
   getAll: async (params) => {
     const response = await api.get('/api/users', { params });
-    // Transform users array
-    if (Array.isArray(response.data)) {
-      response.data = response.data.map(transformUser);
-    } else if (response.data.content) {
-      response.data.content = response.data.content.map(transformUser);
-    } else if (response.data.users) {
-      response.data.users = response.data.users.map(transformUser);
+    // Handle ApiResponse wrapper { success, data, ... }
+    const rawData = response.data?.data || response.data;
+
+    if (Array.isArray(rawData)) {
+      response.data = rawData.map(transformUser);
+    } else if (rawData?.content) {
+      response.data = { ...rawData, content: rawData.content.map(transformUser) };
+    } else if (rawData?.users) {
+      response.data = { ...rawData, content: rawData.users.map(transformUser) };
+    } else {
+      response.data = rawData;
     }
     return response;
   },
@@ -514,8 +595,11 @@ export const usersAPI = {
   delete: (id) => api.delete(`/api/users/${id}`),
   getByRole: async (role) => {
     const response = await api.get('/api/users/by-role', { params: { role } });
-    if (Array.isArray(response.data)) {
-      response.data = response.data.map(transformUser);
+    const rawData = response.data?.data || response.data;
+    if (Array.isArray(rawData)) {
+      response.data = rawData.map(transformUser);
+    } else {
+      response.data = rawData;
     }
     return response;
   },

@@ -3,31 +3,48 @@ import { createTheme } from '@mui/material/styles';
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#1976d2',
-      light: '#42a5f5',
-      dark: '#1565c0',
+      main: '#0d9488', // Teal 600
+      light: '#5eead4', // Teal 300
+      dark: '#0f766e', // Teal 700
+      lighter: '#ccfbf1', // Teal 100
     },
     secondary: {
-      main: '#9c27b0',
-      light: '#ba68c8',
-      dark: '#7b1fa2',
+      main: '#6366f1', // Indigo 500
+      light: '#818cf8', // Indigo 400
+      dark: '#4f46e5', // Indigo 600
+      lighter: '#e0e7ff', // Indigo 100
+    },
+    info: {
+      main: '#0ea5e9',
+      light: '#38bdf8',
+      dark: '#0284c7',
+      lighter: '#e0f2fe',
     },
     success: {
-      main: '#2e7d32',
+      main: '#10b981',
+      light: '#34d399',
+      dark: '#059669',
+      lighter: '#d1fae5',
     },
     warning: {
-      main: '#ed6c02',
+      main: '#f59e0b',
+      light: '#fbbf24',
+      dark: '#d97706',
+      lighter: '#fef3c7',
     },
     error: {
-      main: '#d32f2f',
+      main: '#ef4444',
+      light: '#f87171',
+      dark: '#dc2626',
+      lighter: '#fee2e2',
     },
     background: {
-      default: '#f5f5f5',
+      default: '#f8fafc', // Slate 50
       paper: '#ffffff',
     },
   },
   typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
     h1: {
       fontSize: '2.5rem',
       fontWeight: 500,

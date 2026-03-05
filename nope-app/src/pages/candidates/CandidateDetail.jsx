@@ -51,6 +51,18 @@ const CandidateDetail = () => {
   const [openResumeDialog, setOpenResumeDialog] = useState(false);
   const [resumeFile, setResumeFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    location: '',
+    experience: '',
+    skills: '',
+    linkedInUrl: '',
+  });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchCandidateData();
@@ -112,18 +124,64 @@ const CandidateDetail = () => {
     }
   };
 
+  const handleOpenEditDialog = () => {
+    if (!candidate) return;
+    // Split name into firstName and lastName
+    const nameParts = candidate.name?.trim().split(' ') || [];
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    setFormData({
+      firstName: firstName,
+      lastName: lastName,
+      email: candidate.email,
+      phone: candidate.phone || '',
+      location: candidate.location || '',
+      experience: candidate.experience || '',
+      skills: candidate.skills || '',
+      linkedInUrl: candidate.linkedInUrl || '',
+    });
+    setOpenEditDialog(true);
+  };
+
+  const handleCloseEditDialog = () => {
+    setOpenEditDialog(false);
+  };
+
+  const handleFormChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      await candidatesAPI.update(id, formData);
+      await fetchCandidateData();
+      handleCloseEditDialog();
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to update candidate';
+      setError(errorMsg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const getApplicationStatusColor = (status) => {
     switch (status) {
-      case 'APPLIED':
+      case 'SOURCED':
         return 'info';
-      case 'SCREENING':
+      case 'CONTACTED':
         return 'primary';
-      case 'INTERVIEW':
+      case 'INTERVIEWING':
         return 'warning';
       case 'OFFER':
         return 'success';
-      case 'HIRED':
-        return 'success';
+      case 'NOT_INTERESTED':
+        return 'error';
       case 'REJECTED':
         return 'error';
       default:
@@ -134,12 +192,12 @@ const CandidateDetail = () => {
   const calculateStats = () => {
     const total = applications.length;
     const active = applications.filter(
-      (app) => !['HIRED', 'REJECTED'].includes(app.status)
+      (app) => !['OFFER', 'REJECTED', 'NOT_INTERESTED'].includes(app.status)
     ).length;
-    const hired = applications.filter((app) => app.status === 'HIRED').length;
-    const rejected = applications.filter((app) => app.status === 'REJECTED').length;
+    const offer = applications.filter((app) => app.status === 'OFFER').length;
+    const rejected = applications.filter((app) => app.status === 'REJECTED' || app.status === 'NOT_INTERESTED').length;
 
-    return { total, active, hired, rejected };
+    return { total, active, offer, rejected };
   };
 
   if (loading) {
@@ -218,7 +276,7 @@ const CandidateDetail = () => {
           <Button
             variant="outlined"
             startIcon={<EditIcon />}
-            onClick={() => navigate('/candidates')}
+            onClick={handleOpenEditDialog}
             sx={{
               borderRadius: 2,
               textTransform: 'none',
@@ -436,10 +494,10 @@ const CandidateDetail = () => {
 
               <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
                 <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                  Hired
+                  Offer
                 </Typography>
                 <Chip
-                  label={stats.hired}
+                  label={stats.offer}
                   color="success"
                   sx={{ fontSize: '0.875rem', fontWeight: 600, minWidth: 45 }}
                 />
@@ -566,6 +624,137 @@ const CandidateDetail = () => {
           </Card>
         </Grid>
       </Grid>
+
+      {/* Edit Candidate Dialog */}
+      <Dialog
+        open={openEditDialog}
+        onClose={handleCloseEditDialog}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+          }
+        }}
+      >
+        <form onSubmit={handleUpdate}>
+          <DialogTitle sx={{ pb: 2, pt: 3, fontWeight: 600 }}>
+            Edit Candidate
+          </DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ pt: 2 }}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="First Name"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleFormChange}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Last Name"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleFormChange}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleFormChange}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Phone"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleFormChange}
+                  placeholder="+1234567890"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Location"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleFormChange}
+                  placeholder="City, State"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Years of Experience"
+                  name="experience"
+                  value={formData.experience}
+                  onChange={handleFormChange}
+                  placeholder="e.g., 5 years"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Skills"
+                  name="skills"
+                  value={formData.skills}
+                  onChange={handleFormChange}
+                  placeholder="JavaScript, React, Node.js, etc."
+                  helperText="Separate skills with commas"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="LinkedIn Profile URL"
+                  name="linkedInUrl"
+                  value={formData.linkedInUrl}
+                  onChange={handleFormChange}
+                  placeholder="https://linkedin.com/in/username"
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2 }}>
+            <Button
+              onClick={handleCloseEditDialog}
+              disabled={saving}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 500,
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={saving}
+              startIcon={saving ? <CircularProgress size={20} /> : <EditIcon />}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 500,
+                px: 3,
+                borderRadius: 2,
+              }}
+            >
+              {saving ? 'Updating...' : 'Update'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
 
       {/* Resume Upload Dialog */}
       <Dialog

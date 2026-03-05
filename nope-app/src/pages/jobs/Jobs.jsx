@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -25,6 +26,7 @@ import {
   FormControl,
   InputLabel,
   Select,
+  Tooltip,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -33,15 +35,20 @@ import {
   Search as SearchIcon,
   Work as WorkIcon,
 } from '@mui/icons-material';
-import { jobsAPI, companiesAPI } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
+import { jobsAPI, companiesAPI, usersAPI } from '../../services/api';
 
 const Jobs = () => {
+  const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
   const [jobs, setJobs] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [assignedToFilter, setAssignedToFilter] = useState('ALL');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
   const [formData, setFormData] = useState({
@@ -53,12 +60,14 @@ const Jobs = () => {
     jobType: 'FULL_TIME',
     status: 'OPEN',
     companyId: '',
+    recruiterId: '',
   });
 
   useEffect(() => {
     fetchJobs();
     fetchCompanies();
-  }, []);
+    fetchUsers();
+  }, [currentUser]);
 
   const fetchJobs = async () => {
     try {
@@ -91,6 +100,66 @@ const Jobs = () => {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      console.log('Fetching all users...');
+      const response = await usersAPI.getAll();
+      let data = [];
+
+      // Extract data based on different possible structures
+      if (Array.isArray(response.data)) {
+        data = response.data;
+      } else if (response.data && response.data.content) {
+        data = response.data.content;
+      } else if (response.data && response.data.users) {
+        data = response.data.users;
+      } else if (response.data && typeof response.data === 'object') {
+        // Handle cases where the data might be nested inside the transform output
+        data = response.data.content || response.data.users || [];
+      }
+
+      console.log(`Fetched ${data.length} users successfully.`);
+
+      // De-duplicate and ensure current user is present
+      const userMap = new Map();
+      data.forEach(user => user && user.id && userMap.set(String(user.id), user));
+      if (currentUser && currentUser.id) {
+        userMap.set(String(currentUser.id), currentUser);
+      }
+
+      const finalUsers = Array.from(userMap.values());
+      setUsers(finalUsers);
+    } catch (err) {
+      console.error('Error fetching all users, trying by-role fallback:', err);
+      try {
+        const [recruitersRes, adminsRes] = await Promise.allSettled([
+          usersAPI.getByRole('RECRUITER'),
+          usersAPI.getByRole('ADMIN'),
+        ]);
+
+        const userMap = new Map();
+
+        [recruitersRes, adminsRes].forEach(res => {
+          if (res.status === 'fulfilled' && res.value?.data) {
+            const list = Array.isArray(res.value.data) ? res.value.data : [];
+            list.forEach(user => user && user.id && userMap.set(String(user.id), user));
+          }
+        });
+
+        if (currentUser && currentUser.id) {
+          userMap.set(String(currentUser.id), currentUser);
+        }
+
+        const unique = Array.from(userMap.values());
+        setUsers(unique.length > 0 ? unique : (currentUser ? [currentUser] : []));
+      } catch (fallbackErr) {
+        console.error('Fallback user fetch also failed:', fallbackErr);
+        setUsers(currentUser ? [currentUser] : []);
+      }
+    }
+  };
+
+
   const handleOpenDialog = (job = null) => {
     if (job) {
       setEditingJob(job);
@@ -102,7 +171,8 @@ const Jobs = () => {
         salaryRange: job.salaryRange || '',
         jobType: job.jobType,
         status: job.status,
-        companyId: job.company?.id || '',
+        companyId: String(job.company?.id || ''),
+        recruiterId: String(job.assignedRecruiter?.id || ''),
       });
     } else {
       setEditingJob(null);
@@ -115,6 +185,7 @@ const Jobs = () => {
         jobType: 'FULL_TIME',
         status: 'OPEN',
         companyId: '',
+        recruiterId: '',
       });
     }
     setOpenDialog(true);
@@ -187,7 +258,12 @@ const Jobs = () => {
 
     const matchesStatus = statusFilter === 'ALL' || job.status === statusFilter;
 
-    return matchesSearch && matchesStatus;
+    const matchesAssignedTo =
+      assignedToFilter === 'ALL' ||
+      (assignedToFilter === 'UNASSIGNED' && !job.assignedRecruiter) ||
+      (job.assignedRecruiter?.id === parseInt(assignedToFilter));
+
+    return matchesSearch && matchesStatus && matchesAssignedTo;
   });
 
   if (loading) {
@@ -283,6 +359,23 @@ const Jobs = () => {
               <MenuItem value="CLOSED">Closed</MenuItem>
             </Select>
           </FormControl>
+          <FormControl sx={{ minWidth: 180 }}>
+            <InputLabel>Assigned To</InputLabel>
+            <Select
+              value={assignedToFilter}
+              label="Assigned To"
+              onChange={(e) => setAssignedToFilter(e.target.value)}
+              sx={{ borderRadius: 2 }}
+            >
+              <MenuItem value="ALL">All Users</MenuItem>
+              <MenuItem value="UNASSIGNED">Unassigned</MenuItem>
+              {users.map((u) => (
+                <MenuItem key={u.id} value={String(u.id)}>
+                  {u.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Box>
 
         <TableContainer>
@@ -293,7 +386,8 @@ const Jobs = () => {
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Company</TableCell>
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Location</TableCell>
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Type</TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Salary</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Added By</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Assigned To</TableCell>
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Status</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Actions</TableCell>
               </TableRow>
@@ -302,13 +396,26 @@ const Jobs = () => {
               {filteredJobs.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} align="center">
-                    <Box py={6}>
-                      <WorkIcon sx={{ fontSize: 56, color: 'text.secondary', mb: 2, opacity: 0.5 }} />
-                      <Typography variant="body1" color="text.secondary">
-                        {searchTerm || statusFilter !== 'ALL'
-                          ? 'No jobs found'
-                          : 'No jobs yet. Add your first job!'}
+                    <Box py={6} display="flex" flexDirection="column" alignItems="center">
+                      <WorkIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                      <Typography variant="h6" color="text.secondary" gutterBottom>
+                        {searchTerm || statusFilter !== 'ALL' ? 'No jobs found' : 'No jobs yet'}
                       </Typography>
+                      <Typography variant="body2" color="text.secondary" mb={searchTerm || statusFilter !== 'ALL' ? 3 : 0}>
+                        {searchTerm || statusFilter !== 'ALL' ? "We couldn't find any jobs matching your filters." : 'Add your first job to get started!'}
+                      </Typography>
+                      {(searchTerm || statusFilter !== 'ALL') && (
+                        <Button
+                          variant="outlined"
+                          onClick={() => {
+                            setSearchTerm('');
+                            setStatusFilter('ALL');
+                            setAssignedToFilter('ALL');
+                          }}
+                        >
+                          Clear Filters
+                        </Button>
+                      )}
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -319,12 +426,15 @@ const Jobs = () => {
                     hover
                     sx={{
                       cursor: 'pointer',
+                      '&:nth-of-type(odd)': {
+                        bgcolor: 'background.default',
+                      },
                       '&:hover': {
                         bgcolor: 'action.hover',
                       },
                       transition: 'background-color 0.2s',
                     }}
-                    onClick={() => handleOpenDialog(job)}
+                    onClick={() => navigate(`/jobs/${job.id}`)}
                   >
                     <TableCell>
                       <Box display="flex" alignItems="center" gap={1.5}>
@@ -348,7 +458,12 @@ const Jobs = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" color="text.secondary">
-                        {job.salaryRange || 'Not specified'}
+                        {job.createdBy?.name || 'System'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {job.assignedRecruiter?.name || 'Unassigned'}
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -360,31 +475,36 @@ const Jobs = () => {
                       />
                     </TableCell>
                     <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={() => handleOpenDialog(job)}
-                        sx={{
-                          '&:hover': {
-                            bgcolor: 'primary.lighter',
-                          }
-                        }}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => handleDelete(job.id)}
-                        sx={{
-                          ml: 0.5,
-                          '&:hover': {
-                            bgcolor: 'error.lighter',
-                          }
-                        }}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
+                      <Box display="flex" justifyContent="flex-end" gap={1}>
+                        <Tooltip title="Edit Job" placement="top">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => handleOpenDialog(job)}
+                            sx={{
+                              '&:hover': {
+                                bgcolor: 'primary.lighter',
+                              }
+                            }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete Job" placement="top">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleDelete(job.id)}
+                            sx={{
+                              '&:hover': {
+                                bgcolor: 'error.lighter',
+                              }
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))
@@ -398,12 +518,11 @@ const Jobs = () => {
       <Dialog
         open={openDialog}
         onClose={handleCloseDialog}
-        maxWidth="md"
+        maxWidth="sm"
         fullWidth
         PaperProps={{
           sx: {
             borderRadius: 2,
-            maxHeight: '90vh',
           }
         }}
       >
@@ -411,8 +530,8 @@ const Jobs = () => {
           <DialogTitle sx={{ pb: 2, pt: 3, fontWeight: 600 }}>
             {editingJob ? 'Edit Job' : 'Add New Job'}
           </DialogTitle>
-          <DialogContent sx={{ pt: 2 }}>
-            <Grid container spacing={3}>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ pt: 2 }}>
               <Grid item xs={12}>
                 <TextField
                   fullWidth
@@ -424,6 +543,38 @@ const Jobs = () => {
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
+                <FormControl fullWidth required>
+                  <InputLabel>Status</InputLabel>
+                  <Select
+                    name="status"
+                    value={formData.status}
+                    label="Status"
+                    onChange={handleChange}
+                  >
+                    <MenuItem value="OPEN">Open</MenuItem>
+                    <MenuItem value="ON_HOLD">On Hold</MenuItem>
+                    <MenuItem value="FILLED">Filled</MenuItem>
+                    <MenuItem value="CLOSED">Closed</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth required>
+                  <InputLabel>Job Type</InputLabel>
+                  <Select
+                    name="jobType"
+                    value={formData.jobType}
+                    label="Job Type"
+                    onChange={handleChange}
+                  >
+                    <MenuItem value="FULL_TIME">Full Time</MenuItem>
+                    <MenuItem value="PART_TIME">Part Time</MenuItem>
+                    <MenuItem value="CONTRACT">Contract</MenuItem>
+                    <MenuItem value="INTERNSHIP">Internship</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
                 <FormControl fullWidth required>
                   <InputLabel>Company</InputLabel>
                   <Select
@@ -451,56 +602,42 @@ const Jobs = () => {
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth required>
-                  <InputLabel>Job Type</InputLabel>
-                  <Select
-                    name="jobType"
-                    value={formData.jobType}
-                    label="Job Type"
-                    onChange={handleChange}
-                  >
-                    <MenuItem value="FULL_TIME">Full Time</MenuItem>
-                    <MenuItem value="PART_TIME">Part Time</MenuItem>
-                    <MenuItem value="CONTRACT">Contract</MenuItem>
-                    <MenuItem value="INTERNSHIP">Internship</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth required>
-                  <InputLabel>Status</InputLabel>
-                  <Select
-                    name="status"
-                    value={formData.status}
-                    label="Status"
-                    onChange={handleChange}
-                  >
-                    <MenuItem value="OPEN">Open</MenuItem>
-                    <MenuItem value="ON_HOLD">On Hold</MenuItem>
-                    <MenuItem value="FILLED">Filled</MenuItem>
-                    <MenuItem value="CLOSED">Closed</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12}>
                 <TextField
                   fullWidth
                   label="Salary Range"
                   name="salaryRange"
                   value={formData.salaryRange}
                   onChange={handleChange}
-                  placeholder="e.g., $60,000 - $80,000"
+                  placeholder="e.g., $60k - $80k"
                 />
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Assign Recruiter</InputLabel>
+                  <Select
+                    name="recruiterId"
+                    value={formData.recruiterId}
+                    label="Assign Recruiter"
+                    onChange={handleChange}
+                  >
+                    <MenuItem value="">Unassigned</MenuItem>
+                    {users.map((user) => (
+                      <MenuItem key={user.id} value={String(user.id)}>
+                        {user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim()} ({user.role})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Grid>
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Description"
+                  label="Job Description"
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
                   multiline
-                  rows={3}
+                  rows={2}
                   required
                 />
               </Grid>
@@ -512,8 +649,8 @@ const Jobs = () => {
                   value={formData.requirements}
                   onChange={handleChange}
                   multiline
-                  rows={3}
-                  placeholder="Enter job requirements..."
+                  rows={2}
+                  placeholder="List the key requirements..."
                 />
               </Grid>
             </Grid>

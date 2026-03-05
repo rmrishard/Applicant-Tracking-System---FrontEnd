@@ -27,11 +27,11 @@ import {
 import { applicationsAPI } from '../../services/api';
 
 const statusColumns = [
-  { id: 'APPLIED', label: 'Applied', color: '#2196f3' },
-  { id: 'SCREENING', label: 'Screening', color: '#9c27b0' },
-  { id: 'INTERVIEW', label: 'Interview', color: '#ff9800' },
+  { id: 'SOURCED', label: 'Sourced', color: '#2196f3' },
+  { id: 'CONTACTED', label: 'Contacted', color: '#9c27b0' },
+  { id: 'INTERVIEWING', label: 'Interviewing', color: '#ff9800' },
   { id: 'OFFER', label: 'Offer', color: '#4caf50' },
-  { id: 'HIRED', label: 'Hired', color: '#4caf50' },
+  { id: 'NOT_INTERESTED', label: 'Not Interested', color: '#757575' },
   { id: 'REJECTED', label: 'Rejected', color: '#f44336' },
 ];
 

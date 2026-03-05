@@ -22,15 +22,10 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 
-const DRAWER_WIDTH = 280;
+export const DRAWER_WIDTH = 280;
+export const COLLAPSED_DRAWER_WIDTH = 80;
 
 const menuItems = [
-  {
-    text: 'Dashboard',
-    icon: <DashboardIcon />,
-    path: '/dashboard',
-    roles: ['ADMIN', 'RECRUITER', 'HIRING_MANAGER'],
-  },
   {
     text: 'Companies',
     icon: <BusinessIcon />,
@@ -69,13 +64,14 @@ const menuItems = [
   },
 ];
 
-const Sidebar = ({ mobileOpen, onDrawerToggle }) => {
+const Sidebar = ({ mobileOpen, onDrawerToggle, collapsed }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { hasRole } = useAuth();
 
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Toolbar sx={{ mb: 2 }} /> {/* Spacer to push content below the fixed AppBar */}
       {/* Navigation Menu */}
       <List sx={{ px: 2, py: 3, flex: 1 }}>
         {menuItems.map((item) => {
@@ -122,6 +118,12 @@ const Sidebar = ({ mobileOpen, onDrawerToggle }) => {
                 </ListItemIcon>
                 <ListItemText
                   primary={item.text}
+                  sx={{
+                    opacity: collapsed ? 0 : 1,
+                    transition: 'opacity 0.2s',
+                    whiteSpace: 'nowrap',
+                    display: collapsed ? 'none' : 'block'
+                  }}
                   primaryTypographyProps={{
                     fontWeight: isActive ? 600 : 500,
                     fontSize: '0.95rem',
@@ -168,10 +170,12 @@ const Sidebar = ({ mobileOpen, onDrawerToggle }) => {
           display: { xs: 'none', md: 'block' },
           '& .MuiDrawer-paper': {
             boxSizing: 'border-box',
-            width: DRAWER_WIDTH,
+            width: collapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH,
+            transition: 'width 0.2s',
             borderRight: '1px solid',
             borderColor: 'divider',
             bgcolor: 'background.paper',
+            overflowX: 'hidden',
           },
         }}
         open
@@ -182,5 +186,4 @@ const Sidebar = ({ mobileOpen, onDrawerToggle }) => {
   );
 };
 
-export const DRAWER_WIDTH_EXPORT = DRAWER_WIDTH;
 export default Sidebar;

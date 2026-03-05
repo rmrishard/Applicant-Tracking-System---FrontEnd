@@ -18,6 +18,7 @@ import {
   Paper,
   Avatar,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import {
   Business as BusinessIcon,
   Work as WorkIcon,
@@ -27,6 +28,7 @@ import {
   TrendingUp as TrendingUpIcon,
   Notifications as NotificationsIcon,
   Schedule as ScheduleIcon,
+  WarningAmber as WarningAmberIcon,
 } from '@mui/icons-material';
 import { dashboardAPI, applicationsAPI, jobsAPI, candidatesAPI, companiesAPI } from '../../services/api';
 
@@ -37,41 +39,36 @@ const StatCard = ({ title, value, icon, color, onClick }) => (
     sx={{
       border: '1px solid',
       borderColor: 'divider',
-      borderRadius: 2,
-      height: '100%',
-      width: '100%',
-      display: 'flex',
-      flexDirection: 'column',
+      borderRadius: 1.5,
       cursor: 'pointer',
-      transition: 'all 0.3s ease',
+      transition: 'all 0.2s ease',
+      height: '100%',
       '&:hover': {
-        boxShadow: 3,
+        boxShadow: 2,
         borderColor: `${color}.main`,
         transform: 'translateY(-2px)',
       }
     }}
   >
-    <CardContent sx={{ p: 3, flex: 1, display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100%' }}>
-        <Box sx={{ flex: 1 }}>
+    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Box>
           <Typography
             color="text.secondary"
-            variant="body2"
             sx={{
-              mb: 1.5,
-              fontWeight: 500,
+              mb: 0.5,
+              fontWeight: 600,
               textTransform: 'uppercase',
               letterSpacing: 0.5,
-              fontSize: '0.75rem'
+              fontSize: '0.65rem'
             }}
           >
             {title}
           </Typography>
           <Typography
-            variant="h3"
-            component="div"
+            variant="h4"
             sx={{
-              fontWeight: 600,
+              fontWeight: 700,
               color: 'text.primary'
             }}
           >
@@ -80,14 +77,14 @@ const StatCard = ({ title, value, icon, color, onClick }) => (
         </Box>
         <Box
           sx={{
-            backgroundColor: `${color}.light`,
-            borderRadius: 2,
-            p: 2,
+            backgroundColor: (theme) => alpha(theme.palette[color].main, 0.1),
+            borderRadius: 1.5,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            minWidth: 56,
-            minHeight: 56,
+            width: 44,
+            height: 44,
+            color: `${color}.main`,
           }}
         >
           {icon}
@@ -145,9 +142,9 @@ const Dashboard = () => {
           .slice(0, 5);
         setRecentJobs(recentOpenJobs);
 
-        // Get pending follow-ups (applications in INTERVIEW stage)
+        // Get pending follow-ups (applications in INTERVIEWING or OFFER stage)
         const followUps = appsData
-          .filter((app) => app.status === 'INTERVIEW' || app.status === 'OFFER')
+          .filter((app) => app.status === 'INTERVIEWING' || app.status === 'OFFER')
           .slice(0, 5);
         setPendingFollowUps(followUps);
 
@@ -181,11 +178,11 @@ const Dashboard = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'APPLIED': return 'info';
-      case 'SCREENING': return 'primary';
-      case 'INTERVIEW': return 'warning';
+      case 'SOURCED': return 'info';
+      case 'CONTACTED': return 'primary';
+      case 'INTERVIEWING': return 'warning';
       case 'OFFER': return 'success';
-      case 'HIRED': return 'success';
+      case 'NOT_INTERESTED': return 'error';
       case 'REJECTED': return 'error';
       default: return 'default';
     }
@@ -206,120 +203,52 @@ const Dashboard = () => {
         <Typography variant="h4" sx={{ fontWeight: 600, color: 'text.primary' }}>
           Dashboard
         </Typography>
-        <Box
-          sx={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 1.5,
-          }}
-        >
-          <Button
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={() => navigate('/companies')}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 500,
-              px: 2.5,
-              py: 1,
-            }}
-          >
-            Company
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={() => navigate('/jobs')}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 500,
-              px: 2.5,
-              py: 1,
-            }}
-          >
-            Job
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={() => navigate('/candidates')}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 500,
-              px: 2.5,
-              py: 1,
-            }}
-          >
-            Candidate
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => navigate('/applications')}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 500,
-              px: 3,
-              py: 1,
-              boxShadow: 2,
-              '&:hover': {
-                boxShadow: 4,
-              }
-            }}
-          >
-            Application
-          </Button>
-        </Box>
       </Box>
 
-      {/* Stats Cards Row - No wrapping */}
-      <Box sx={{ display: 'flex', gap: 3, mb: 3, minWidth: 0 }}>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+      {/* Stats Cards Row */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Total Companies"
             value={stats?.totalCompanies || 0}
-            icon={<BusinessIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
+            icon={<BusinessIcon sx={{ fontSize: 24 }} />}
             color="primary"
             onClick={() => navigate('/companies')}
           />
-        </Box>
+        </Grid>
 
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Active Jobs"
             value={stats?.totalJobs || 0}
-            icon={<WorkIcon sx={{ fontSize: 40, color: 'secondary.main' }} />}
+            icon={<WorkIcon sx={{ fontSize: 24 }} />}
             color="secondary"
             onClick={() => navigate('/jobs')}
           />
-        </Box>
+        </Grid>
 
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Total Candidates"
             value={stats?.totalCandidates || 0}
-            icon={<PeopleIcon sx={{ fontSize: 40, color: 'success.main' }} />}
+            icon={<PeopleIcon sx={{ fontSize: 24 }} />}
             color="success"
             onClick={() => navigate('/candidates')}
           />
-        </Box>
+        </Grid>
 
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Applications"
             value={stats?.totalApplications || 0}
-            icon={<DescriptionIcon sx={{ fontSize: 40, color: 'warning.main' }} />}
+            icon={<DescriptionIcon sx={{ fontSize: 24 }} />}
             color="warning"
             onClick={() => navigate('/applications')}
           />
-        </Box>
-      </Box>
+        </Grid>
+      </Grid>
 
-      <Grid container spacing={3}>
+      <Grid container spacing={2}>
 
         {/* Recent Activity Feed */}
         <Grid item xs={12} md={4}>
@@ -332,8 +261,8 @@ const Dashboard = () => {
               height: '100%',
             }}
           >
-            <CardContent sx={{ p: 3 }}>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2.5}>
+            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Box display="flex" alignItems="center" gap={1}>
                   <TrendingUpIcon sx={{ color: 'primary.main', fontSize: 24 }} />
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -430,8 +359,8 @@ const Dashboard = () => {
               height: '100%',
             }}
           >
-            <CardContent sx={{ p: 3 }}>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2.5}>
+            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Box display="flex" alignItems="center" gap={1}>
                   <ScheduleIcon sx={{ color: 'warning.main', fontSize: 24 }} />
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -489,7 +418,13 @@ const Dashboard = () => {
                               color={getStatusColor(app.status)}
                               sx={{ height: 22, fontSize: '0.7rem', fontWeight: 500 }}
                             />
-                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }} component="span">
+                            <Typography
+                              variant="caption"
+                              color="error.main"
+                              sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.75rem', fontWeight: 600 }}
+                              component="span"
+                            >
+                              <WarningAmberIcon fontSize="small" sx={{ fontSize: '1rem' }} />
                               Requires attention
                             </Typography>
                           </Box>
@@ -513,8 +448,8 @@ const Dashboard = () => {
               borderRadius: 2,
             }}
           >
-            <CardContent sx={{ p: 3 }}>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2.5}>
+            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Box display="flex" alignItems="center" gap={1}>
                   <WorkIcon sx={{ color: 'secondary.main', fontSize: 24 }} />
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>

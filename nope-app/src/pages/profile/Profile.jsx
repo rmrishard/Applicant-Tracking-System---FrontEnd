@@ -11,11 +11,14 @@ import {
   Avatar,
   Divider,
   Chip,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import {
   Person as PersonIcon,
   Save as SaveIcon,
   Shield as ShieldIcon,
+  PhotoCamera as PhotoCameraIcon,
 } from '@mui/icons-material';
 import { usersAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -123,6 +126,12 @@ const Profile = () => {
     return role?.replace('_', ' ') || '';
   };
 
+  const getInitials = (first, last) => {
+    if (first && last) return `${first[0]}${last[0]}`.toUpperCase();
+    if (first) return first[0].toUpperCase();
+    return 'U';
+  };
+
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -155,29 +164,52 @@ const Profile = () => {
           <Card>
             <CardContent>
               <Box display="flex" flexDirection="column" alignItems="center" gap={2}>
-                <Avatar
-                  sx={{
-                    width: 120,
-                    height: 120,
-                    bgcolor: user?.role === 'ADMIN' ? 'error.main' : 'primary.main',
-                    fontSize: '3rem',
-                  }}
-                >
-                  {user?.role === 'ADMIN' ? <ShieldIcon sx={{ fontSize: '3rem' }} /> : <PersonIcon sx={{ fontSize: '3rem' }} />}
-                </Avatar>
+                <Box position="relative">
+                  <Avatar
+                    sx={{
+                      width: 120,
+                      height: 120,
+                      bgcolor: user?.role === 'ADMIN' ? 'error.main' : 'primary.main',
+                      fontSize: '3rem',
+                      fontWeight: 600,
+                      boxShadow: 2,
+                    }}
+                  >
+                    {getInitials(user?.firstName, user?.lastName)}
+                  </Avatar>
+                  {editing && (
+                    <Tooltip title="Change Picture">
+                      <IconButton
+                        color="primary"
+                        sx={{
+                          position: 'absolute',
+                          bottom: 0,
+                          right: 0,
+                          bgcolor: 'background.paper',
+                          boxShadow: 2,
+                          '&:hover': { bgcolor: 'background.default' },
+                        }}
+                        component="label"
+                      >
+                        <input hidden accept="image/*" type="file" />
+                        <PhotoCameraIcon />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </Box>
                 <Box textAlign="center">
-                  <Typography variant="h5" gutterBottom>
+                  <Typography variant="h5" fontWeight={600} gutterBottom>
                     {user?.firstName} {user?.lastName}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" gutterBottom>
                     @{user?.username}
                   </Typography>
-                  <Chip
-                    label={getRoleLabel(user?.role)}
-                    size="small"
-                    color={getRoleColor(user?.role)}
-                    sx={{ mt: 1 }}
-                  />
+                  <Box mt={1.5} display="inline-flex" alignItems="center" gap={1} px={2} py={0.5} borderRadius={2} bgcolor={`${getRoleColor(user?.role)}.lighter`}>
+                    {user?.role === 'ADMIN' ? <ShieldIcon fontSize="small" color="error" /> : <PersonIcon fontSize="small" color="primary" />}
+                    <Typography variant="body2" fontWeight={600} color={`${getRoleColor(user?.role)}.main`}>
+                      {getRoleLabel(user?.role)}
+                    </Typography>
+                  </Box>
                 </Box>
               </Box>
             </CardContent>

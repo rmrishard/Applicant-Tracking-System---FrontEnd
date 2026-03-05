@@ -36,8 +36,8 @@ function App() {
       <AuthProvider>
         <Router>
           <Routes>
-            {/* Redirect root to dashboard */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            {/* Redirect root to companies */}
+            <Route path="/" element={<Navigate to="/companies" replace />} />
 
             {/* Public routes */}
             <Route path="/login" element={<Login />} />

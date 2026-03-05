@@ -19,7 +19,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 
-const Header = ({ onDrawerToggle }) => {
+const Header = ({ onDrawerToggle, onToggleCollapse, collapsed }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [anchorEl, setAnchorEl] = useState(null);
@@ -77,6 +77,15 @@ const Header = ({ onDrawerToggle }) => {
           <MenuIcon />
         </IconButton>
 
+        <IconButton
+          color="inherit"
+          edge="start"
+          onClick={onToggleCollapse}
+          sx={{ mr: 2, display: { xs: 'none', md: 'flex' } }}
+        >
+          <MenuIcon />
+        </IconButton>
+
         <Typography
           variant="h6"
           noWrap
@@ -93,7 +102,7 @@ const Header = ({ onDrawerToggle }) => {
           Applicant Tracking System
         </Typography>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, pr: { xs: 1, sm: 2 } }}>
           {user && (
             <>
               <Chip

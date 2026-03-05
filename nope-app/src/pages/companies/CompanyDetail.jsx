@@ -15,6 +15,11 @@ import {
   List,
   ListItem,
   ListItemText,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -34,6 +39,16 @@ const CompanyDetail = () => {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    industry: '',
+    location: '',
+    website: '',
+    description: '',
+  });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchCompanyData();
@@ -75,6 +90,45 @@ const CompanyDetail = () => {
     }
   };
 
+  const handleOpenEditDialog = () => {
+    if (!company) return;
+    setFormData({
+      name: company.name,
+      phone: company.phone || '',
+      industry: company.industry,
+      location: company.location,
+      website: company.website || '',
+      description: company.description || '',
+    });
+    setOpenEditDialog(true);
+  };
+
+  const handleCloseEditDialog = () => {
+    setOpenEditDialog(false);
+  };
+
+  const handleFormChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      await companiesAPI.update(id, formData);
+      await fetchCompanyData();
+      handleCloseEditDialog();
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to update company';
+      setError(errorMsg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -110,7 +164,7 @@ const CompanyDetail = () => {
           </Box>
         </Box>
         <Box>
-          <Button startIcon={<EditIcon />} onClick={() => navigate('/companies')} sx={{ mr: 1 }}>
+          <Button startIcon={<EditIcon />} onClick={handleOpenEditDialog} sx={{ mr: 1 }}>
             Edit
           </Button>
           <Button
@@ -298,6 +352,116 @@ const CompanyDetail = () => {
           </Card>
         </Grid>
       </Grid>
+
+      {/* Edit Company Dialog */}
+      <Dialog
+        open={openEditDialog}
+        onClose={handleCloseEditDialog}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+          }
+        }}
+      >
+        <form onSubmit={handleUpdate}>
+          <DialogTitle sx={{ pb: 2, pt: 3, fontWeight: 600 }}>
+            Edit Company
+          </DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ pt: 2 }}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Company Name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleFormChange}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Industry"
+                  name="industry"
+                  value={formData.industry}
+                  onChange={handleFormChange}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Location"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleFormChange}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Phone"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleFormChange}
+                  placeholder="+1234567890"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Website"
+                  name="website"
+                  value={formData.website}
+                  onChange={handleFormChange}
+                  placeholder="https://example.com"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleFormChange}
+                  multiline
+                  rows={2}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2 }}>
+            <Button
+              onClick={handleCloseEditDialog}
+              disabled={saving}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 500,
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={saving}
+              startIcon={saving ? <CircularProgress size={20} /> : <EditIcon />}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 500,
+                px: 3,
+                borderRadius: 2,
+              }}
+            >
+              {saving ? 'Updating...' : 'Update'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
     </Box>
   );
 };
