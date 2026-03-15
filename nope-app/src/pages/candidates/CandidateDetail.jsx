@@ -434,16 +434,42 @@ const CandidateDetail = () => {
                         <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                           Resume
                         </Typography>
-                        <Typography variant="body1" sx={{ mt: 0.5 }}>
-                          <a
-                            href={candidate.resumePath}
+                        <Box display="flex" gap={2} mt={0.5}>
+                          <Button
+                            variant="text"
+                            component="a"
+                            href={`${(import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080')}${candidate.resumePath}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{ color: 'inherit', textDecoration: 'underline' }}
+                            sx={{
+                              p: 0,
+                              textTransform: 'none',
+                              color: 'primary.main',
+                              textDecoration: 'underline',
+                              '&:hover': { textDecoration: 'none', bgcolor: 'transparent' },
+                              minWidth: 'auto',
+                            }}
                           >
                             View Resume
-                          </a>
-                        </Typography>
+                          </Button>
+                          <Typography variant="body2" color="text.secondary">|</Typography>
+                          <Button
+                            variant="text"
+                            component="a"
+                            href={`${(import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080')}${candidate.resumePath}`}
+                            download
+                            sx={{
+                              p: 0,
+                              textTransform: 'none',
+                              color: 'primary.main',
+                              textDecoration: 'underline',
+                              '&:hover': { textDecoration: 'none', bgcolor: 'transparent' },
+                              minWidth: 'auto',
+                            }}
+                          >
+                            Download Resume
+                          </Button>
+                        </Box>
                       </Box>
                     </Box>
                   </Grid>
