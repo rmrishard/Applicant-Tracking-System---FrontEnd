@@ -20,7 +20,7 @@ import {
   Shield as ShieldIcon,
   PhotoCamera as PhotoCameraIcon,
 } from '@mui/icons-material';
-import { usersAPI } from '../../services/api';
+import { usersAPI, authAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 
 const Profile = () => {
@@ -60,6 +60,10 @@ const Profile = () => {
         setError('Password must be at least 6 characters long');
         return;
       }
+      if (!formData.currentPassword) {
+        setError('Current password is required to change password');
+        return;
+      }
     }
 
     try {
@@ -76,7 +80,11 @@ const Profile = () => {
 
       // Step 2: Change password separately if provided
       if (formData.newPassword) {
-        await usersAPI.changePassword(user.id, formData.newPassword);
+        await authAPI.changePassword({
+          currentPassword: formData.currentPassword,
+          newPassword: formData.newPassword,
+          confirmPassword: formData.confirmPassword,
+        });
       }
 
       // Update auth context with new user data
@@ -279,6 +287,17 @@ const Profile = () => {
                         <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                           Change Password (Optional)
                         </Typography>
+                      </Grid>
+                      <Grid item xs={12}>
+                        <TextField
+                          fullWidth
+                          label="Current Password"
+                          name="currentPassword"
+                          type="password"
+                          value={formData.currentPassword}
+                          onChange={handleChange}
+                          helperText="Required to change password"
+                        />
                       </Grid>
                       <Grid item xs={12}>
                         <TextField

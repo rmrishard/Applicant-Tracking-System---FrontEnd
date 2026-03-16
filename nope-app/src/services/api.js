@@ -143,6 +143,7 @@ export const authAPI = {
     }
     return response;
   },
+  changePassword: (data) => api.post('/auth/change-password', data),
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
