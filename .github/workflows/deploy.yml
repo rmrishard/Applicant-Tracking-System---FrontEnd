@@ -1,0 +1,70 @@
+name: Deploy Frontend to VPS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout frontend code
+      uses: actions/checkout@v4
+
+    - name: Deploy to VPS
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ubuntu
+        key: ${{ secrets.VPS_SSH_KEY }}
+        script: |
+          echo "=== Starting Frontend Deployment ==="
+
+          echo "=== Pulling latest frontend code ==="
+          cd ~/Applicant-Tracking-System---FrontEnd
+          git pull origin main
+
+          echo "=== Copying frontend to backend for building ==="
+          cd ~/Applicant-Tracking-System---Backend/ATS\ SpringBoot/demo
+          rm -rf frontend
+          mkdir -p frontend
+          cp -r ~/Applicant-Tracking-System---FrontEnd/nope-app/* frontend/
+          cp ~/Applicant-Tracking-System---FrontEnd/nope-app/package*.json frontend/
+
+          echo "=== Creating Dockerfile ==="
+          cat > frontend/Dockerfile << 'DOCKERFILE'
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+DOCKERFILE
+
+          echo "=== Creating nginx.conf ==="
+          cat > frontend/nginx.conf << 'NGINX'
+server {
+    listen 80;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+NGINX
+
+          echo "=== Rebuilding frontend ==="
+          docker-compose -f docker-compose.prod.yml up --build -d frontend
+
+          echo "=== Cleaning up ==="
+          docker system prune -f
+
+          echo "=== Frontend Deployment Complete ==="
