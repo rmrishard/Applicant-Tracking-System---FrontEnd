@@ -31,10 +31,17 @@ jobs:
           rm -rf frontend
           cp -r ~/Applicant-Tracking-System---FrontEnd/nope-app frontend/
 
-          echo "=== Rebuilding frontend ==="
-          docker-compose -f docker-compose.prod.yml up --build -d frontend
+          echo "=== Stopping frontend container ==="
+          docker-compose -f docker-compose.prod.yml stop frontend
+          docker-compose -f docker-compose.prod.yml rm -f frontend
+
+          echo "=== Building frontend fresh ==="
+          docker-compose -f docker-compose.prod.yml build --no-cache frontend
+
+          echo "=== Starting frontend ==="
+          docker-compose -f docker-compose.prod.yml up -d frontend
 
           echo "=== Cleaning up ==="
-          docker system prune -f
+          docker system prune -af
 
           echo "=== Frontend Deployment Complete ==="
