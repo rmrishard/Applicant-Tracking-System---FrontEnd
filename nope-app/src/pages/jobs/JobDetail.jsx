@@ -151,7 +151,7 @@ const JobDetail = () => {
 
   const handleOpenDialog = () => {
     setOpenDialog(true);
-    setTabValue(0);
+    setTabValue(1);
     setSelectedCandidateId('');
     setFormData({
       firstName: '',
@@ -214,12 +214,6 @@ const JobDetail = () => {
   };
 
   const handleTabChange = (event, newValue) => {
-    // If switching to "New Candidate" tab, navigate to candidates page with job ID
-    if (newValue === 1) {
-      navigate(`/candidates?fromJob=${id}`);
-      setOpenDialog(false);
-      return;
-    }
     setTabValue(newValue);
   };
 
