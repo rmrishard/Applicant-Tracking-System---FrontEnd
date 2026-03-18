@@ -47,6 +47,8 @@ import {
   Description as DescriptionIcon,
   Person as PersonIcon,
   Add as AddIcon,
+  CloudUpload as CloudUploadIcon,
+  AttachFile as AttachFileIcon,
 } from '@mui/icons-material';
 import { jobsAPI, applicationsAPI, candidatesAPI, companiesAPI, usersAPI } from '../../services/api';
 
@@ -73,6 +75,7 @@ const JobDetail = () => {
     notes: '',
   });
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [companies, setCompanies] = useState([]);
@@ -280,6 +283,44 @@ const JobDetail = () => {
         setError('Failed to delete job');
         console.error('Error deleting job:', err);
       }
+    }
+  };
+
+  const getFileUrl = (path) => {
+    if (!path) return '#';
+    if (path.startsWith('http')) return path;
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${cleanBaseUrl}${cleanPath}`;
+  };
+
+  const handleFileChange = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    try {
+      setUploading(true);
+      await jobsAPI.uploadAttachments(id, files);
+      await fetchJobData();
+    } catch (err) {
+      setError('Failed to upload files');
+      console.error(err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId) => {
+    if (!window.confirm('Are you sure you want to delete this attachment?')) return;
+    try {
+      setSaving(true);
+      await jobsAPI.deleteAttachment(attachmentId);
+      await fetchJobData();
+    } catch (err) {
+      setError('Failed to delete attachment');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -536,6 +577,101 @@ const JobDetail = () => {
                 </Typography>
               </Box>
             )}
+
+            <Divider sx={{ my: 1, opacity: 0.5 }} />
+            
+            <Box>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2.5}>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                  Job Attachments
+                </Typography>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  startIcon={uploading ? <CircularProgress size={20} /> : <CloudUploadIcon />}
+                  disabled={uploading}
+                  size="small"
+                  sx={{ borderRadius: 2, textTransform: 'none', px: 2 }}
+                >
+                  {uploading ? 'Uploading...' : 'Upload Files'}
+                  <input
+                    type="file"
+                    hidden
+                    multiple
+                    onChange={handleFileChange}
+                  />
+                </Button>
+              </Box>
+              
+              {job.attachments && job.attachments.length > 0 ? (
+                <Grid container spacing={2}>
+                  {job.attachments.map((file) => (
+                    <Grid item xs={12} sm={6} key={file.id}>
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 1.5,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          borderRadius: 3,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          bgcolor: 'background.paper',
+                          transition: 'all 0.2s',
+                          '&:hover': { 
+                            bgcolor: 'rgba(0,0,0,0.01)',
+                            borderColor: 'primary.light',
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+                          }
+                        }}
+                      >
+                        <Box display="flex" alignItems="center" gap={1.5} sx={{ minWidth: 0 }}>
+                          <Avatar sx={{ bgcolor: 'rgba(25, 118, 210, 0.08)', color: 'primary.main', width: 36, height: 36 }}>
+                            <AttachFileIcon sx={{ fontSize: 20 }} />
+                          </Avatar>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="body2" noWrap sx={{ fontWeight: 700, color: 'text.primary' }}>
+                              {file.fileName}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {(file.fileSize / 1024).toFixed(1)} KB
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Stack direction="row" spacing={0.5}>
+                          <IconButton 
+                            size="small" 
+                            color="primary"
+                            onClick={() => window.open(getFileUrl(file.fileUrl), '_blank')}
+                            title="View File"
+                          >
+                            <DescriptionIcon sx={{ fontSize: 20 }} />
+                          </IconButton>
+                          <IconButton 
+                            size="small" 
+                            color="error"
+                            onClick={() => handleDeleteAttachment(file.id)}
+                            title="Delete File"
+                          >
+                            <DeleteIcon sx={{ fontSize: 20 }} />
+                          </IconButton>
+                        </Stack>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+              ) : (
+                <Box sx={{ py: 3, textAlign: 'center', border: '1px dashed', borderColor: 'divider', borderRadius: 3, bgcolor: 'rgba(0,0,0,0.01)' }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', opacity: 0.7 }}>
+                    No attachments uploaded for this job yet.
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+
+            <Divider sx={{ my: 1, opacity: 0.5 }} />
 
             <Box pt={2}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>

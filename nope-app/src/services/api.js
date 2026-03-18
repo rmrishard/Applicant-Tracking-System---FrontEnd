@@ -109,6 +109,7 @@ const transformJob = (job) => {
     company: job.company ? transformCompany(job.company) : null,
     assignedRecruiter: transformedAssignedRecruiter,
     createdBy: transformedCreatedBy,
+    attachments: job.attachments || [],
   };
 };
 
@@ -335,6 +336,20 @@ export const jobsAPI = {
       response.data.content = response.data.jobs.map(transformJob);
     }
     return response;
+  },
+  uploadAttachments: async (id, files) => {
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+    }
+    return api.post(`/api/jobs/${id}/attachments`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  deleteAttachment: (attachmentId) => {
+    return api.delete(`/api/jobs/attachments/${attachmentId}`);
   },
 };
 
