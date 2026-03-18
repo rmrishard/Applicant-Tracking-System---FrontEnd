@@ -66,26 +66,22 @@ const CandidateDetail = () => {
 
   const getResumeUrl = (path) => {
     if (!path) return '#';
-    // If it's already an absolute URL (e.g., from AWS S3), use it directly
     if (path.startsWith('http')) return path;
     
-    // Fallback to the environment base URL or current domain
     const baseUrl = import.meta.env.VITE_API_BASE_URL || window.location.origin;
     
-    // Ensure the baseUrl doesn't end with a slash if we use it with a path
-    const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-    // Ensure the path starts with a slash
-    const cleanPath = path.startsWith('/') ? path : `/${path}`;
-    
-    const finalUrl = `${cleanBase}${cleanPath}`;
-    
-    // If we've accidentally created a protocol-relative URL starting with // (like //uploads)
-    // we need to prepend the protocol from the current domain if we're in a browser
-    if (finalUrl.startsWith('//') && !finalUrl.startsWith('//host')) {
-      return `${window.location.protocol}${finalUrl}`;
+    try {
+      // If baseUrl is just a path like '/', URL constructor might need origin
+      const absoluteBase = baseUrl.startsWith('http') 
+        ? baseUrl 
+        : new URL(baseUrl, window.location.origin).toString();
+        
+      const url = new URL(path, absoluteBase);
+      return url.toString();
+    } catch (e) {
+      console.error('Error constructing resume URL:', e);
+      return path;
     }
-    
-    return finalUrl;
   };
 
   useEffect(() => {
