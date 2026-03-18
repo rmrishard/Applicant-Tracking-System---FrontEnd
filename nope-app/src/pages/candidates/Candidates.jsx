@@ -161,6 +161,8 @@ const Candidates = () => {
 
       if (editingCandidate) {
         await candidatesAPI.update(editingCandidate.id, payload);
+        fetchCandidates();
+        handleCloseDialog();
       } else {
         const response = await candidatesAPI.create(payload);
         const newCandidateId = response.data?.id;
@@ -177,9 +179,16 @@ const Candidates = () => {
           navigate(`/jobs/${fromJobId}`);
           return;
         }
+        
+        // Navigate to new candidate profile and exit
+        if (newCandidateId) {
+          navigate(`/candidates/${newCandidateId}`);
+          return;
+        }
+        
+        fetchCandidates();
+        handleCloseDialog();
       }
-      fetchCandidates();
-      handleCloseDialog();
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to save candidate';
       setError(errorMsg);
