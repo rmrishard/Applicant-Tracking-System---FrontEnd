@@ -232,10 +232,14 @@ const JobDetail = () => {
 
       // If adding new candidate
       if (tabValue === 1) {
+        const finalEmail = (!formData.email || formData.email.trim() === '') 
+          ? `noemail_${Date.now()}@ats.com` 
+          : formData.email;
+
         const candidateRes = await candidatesAPI.create({
           firstName: formData.firstName,
           lastName: formData.lastName,
-          email: formData.email,
+          email: finalEmail,
           phone: formData.phone,
           location: formData.location,
           experience: formData.experience,
@@ -827,7 +831,6 @@ const JobDetail = () => {
                       type="email"
                       value={formData.email}
                       onChange={handleFormChange}
-                      required={tabValue === 1}
                       size="small"
                       sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5 } }}
                     />

@@ -153,10 +153,16 @@ const Candidates = () => {
     e.preventDefault();
     try {
       setSaving(true);
+      
+      const payload = { ...formData };
+      if (!payload.email || payload.email.trim() === '') {
+        payload.email = `noemail_${Date.now()}@ats.com`;
+      }
+
       if (editingCandidate) {
-        await candidatesAPI.update(editingCandidate.id, formData);
+        await candidatesAPI.update(editingCandidate.id, payload);
       } else {
-        const response = await candidatesAPI.create(formData);
+        const response = await candidatesAPI.create(payload);
         const newCandidateId = response.data?.id;
 
         // If creating from a job, auto-link the candidate to the job
@@ -701,7 +707,6 @@ const Candidates = () => {
                   type="email"
                   value={formData.email}
                   onChange={handleChange}
-                  required
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
