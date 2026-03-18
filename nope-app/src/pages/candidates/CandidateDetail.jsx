@@ -435,10 +435,14 @@ const CandidateDetail = () => {
                           Resume
                         </Typography>
                         <Box display="flex" gap={2} mt={0.5}>
-                          <Button
+                            <Button
                             variant="text"
                             component="a"
-                            href={`${(import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080')}${candidate.resumePath}`}
+                            href={
+                              candidate.resumePath?.startsWith('http')
+                                ? candidate.resumePath
+                                : `${import.meta.env.VITE_API_BASE_URL || 'https://ats.yuvvoke.store'}${candidate.resumePath?.startsWith('/') ? '' : '/'}${candidate.resumePath}`
+                            }
                             target="_blank"
                             rel="noopener noreferrer"
                             sx={{
@@ -456,7 +460,11 @@ const CandidateDetail = () => {
                           <Button
                             variant="text"
                             component="a"
-                            href={`${(import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080')}${candidate.resumePath}`}
+                            href={
+                              candidate.resumePath?.startsWith('http')
+                                ? candidate.resumePath
+                                : `${import.meta.env.VITE_API_BASE_URL || 'https://ats.yuvvoke.store'}${candidate.resumePath?.startsWith('/') ? '' : '/'}${candidate.resumePath}`
+                            }
                             download
                             sx={{
                               p: 0,
